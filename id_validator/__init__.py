@@ -9,5 +9,6 @@ __author__ = "ID Photo Validator Team"
 
 from .validator import validate_id_photo
 from .gui import IDPhotoValidatorGUI
+from .models import ValidationResponse, ValidationRequest, HealthResponse, ErrorResponse
 
-__all__ = ["validate_id_photo", "IDPhotoValidatorGUI"]
+__all__ = ["validate_id_photo", "IDPhotoValidatorGUI", "ValidationResponse", "ValidationRequest", "HealthResponse", "ErrorResponse"]
