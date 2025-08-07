@@ -1,44 +1,60 @@
 # ID Photo Validator
 
-A professional-grade ID photo validation system using OpenCV, machine learning, and advanced computer vision techniques to ensure compliance with standard ID photo requirements.
+A professional-grade ID photo validation system using OpenCV and machine learning to ensure photos meet standard requirements for official documents.
 
-![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.x-green.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+## Features
 
-## 🎯 Features
+### Core Validation
 
-### Core Validation Checks
+- **Face Detection**: Uses OpenCV DNN with SSD MobileNet for accurate face detection
+- **Facial Landmarks**: 68-point landmark detection for detailed facial analysis
+- **Eye Validation**: Advanced Eye Aspect Ratio (EAR) calculation to detect closed eyes
+- **Quality Assessment**: Cartoon/drawing detection using color clustering analysis
+- **Size Validation**: Ensures face occupies appropriate portion of image (5-80%)
+- **Obstruction Detection**: Identifies hands, objects, or other obstructions covering the face
+- **Mouth Validation**: Checks for proper mouth visibility and positioning
 
-- ✅ **Face Detection**: Ensures exactly one face is present in the image
-- ✅ **Face Size Validation**: Verifies face occupies appropriate portion of image (5%-80%)
-- ✅ **High Confidence Requirement**: Minimum 85% face detection confidence
-- ✅ **Facial Landmark Detection**: Requires all 68 facial landmarks to be detected
-- ✅ **Obstruction Detection**: Identifies when face is covered by hands or objects
-- ✅ **Eye Visibility Check**: Ensures both eyes are clearly visible and properly shaped
-- ✅ **Mouth Region Analysis**: Verifies mouth area is unobstructed
-- ✅ **Skin Color Analysis**: Detects insufficient skin visibility (hands covering face)
-- ✅ **Landmark Clustering Analysis**: Detects incorrect landmark placement
+### Configurable Validation Categories
 
-### User Interface
+- **Face Sizing**: Validates face size ratio within image
+- **Landmark Analysis**: Comprehensive facial landmark detection and analysis
+- **Eye Validation**: Closed eye detection using Eye Aspect Ratio (EAR)
+- **Obstruction Detection**: Skin color analysis to detect face coverings
+- **Mouth Validation**: Mouth visibility and positioning checks
+- **Quality Assessment**: Cartoon/drawing detection and image quality analysis
 
-- 🖥️ **GUI**: Clean, intuitive Tkinter-based interface
-- 🖼️ **Image Preview**: Side-by-side original and annotated image display
-- 📊 **Detailed Results**: Comprehensive validation feedback with specific failure reasons
-- ⏱️ **Processing Time**: Real-time performance metrics
-- 🎨 **Visual Annotations**: Cyan-colored facial landmarks and bounding boxes
-- ⚠️ **Error Indicators**: Clear visual warnings for validation failures
+### User Interfaces
 
-## 📋 Requirements
+- **Professional GUI**: User-friendly interface with configurable validation settings
+- **REST API**: FastAPI-based web service with configurable validation presets
+- **Annotated Results**: Visual feedback showing detected landmarks and validation issues
+- **Preset Configurations**: Strict, Basic, and Lenient validation modes
 
-- Python 3.8 or higher
-- OpenCV with contrib modules
-- scikit-learn
-- Pillow (PIL)
-- tkinter (usually included with Python)
-- NumPy (dependency of OpenCV)
+## Usage
 
-## 🚀 Installation & Setup
+### GUI Application
+
+Run the desktop application:
+
+```bash
+python main.py
+```
+
+The GUI provides:
+
+- **Image Upload**: Drag & drop or browse for image files
+- **Validation Configuration**: Choose from preset modes or customize individual validation categories:
+  - **Strict Mode**: All validation categories enabled (default)
+  - **Basic Mode**: Essential validations only (face sizing, eye validation)
+  - **Lenient Mode**: Core validations only (file handling, face detection)
+  - **Custom Mode**: Individual control over each validation category
+- **Real-time Results**: Instant validation feedback with detailed reasons
+- **Annotated Images**: Visual display with facial landmarks and validation overlays
+- **Processing Time**: Performance metrics for each validation
+
+**Supported formats**: JPG, PNG, BMP, TIFF
+
+## Installation
 
 ### Using Virtual Environment (Recommended)
 
@@ -56,18 +72,140 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 📁 Project Structure
+### Dependencies
+
+- Python 3.8 or higher
+- OpenCV with contrib modules
+- scikit-learn
+- Pillow (PIL)
+- tkinter (usually included with Python)
+- NumPy (dependency of OpenCV)
+- FastAPI and Uvicorn (for API)
+- Requests (for API client)
+
+### REST API
+
+Start the API server:
+
+```bash
+python start_api.py
+```
+
+The API will be available at `http://localhost:8000` with interactive documentation at `http://localhost:8000/docs`.
+
+#### Endpoints
+
+- `POST /validate` - Upload and validate an image file with configurable validation
+- `POST /validate-base64` - Validate a base64 encoded image with configurable validation
+- `GET /health` - Check API health status
+
+#### Validation Configuration
+
+The API supports three validation presets:
+
+- **strict** (default): All validation categories enabled
+- **basic**: Essential validations (face sizing, eye validation)
+- **lenient**: Core validations only (face detection)
+- **custom**: Individual control via parameters
+
+#### Example Usage
+
+```python
+import requests
+
+# Strict validation (default)
+with open('photo.jpg', 'rb') as f:
+    response = requests.post(
+        'http://localhost:8000/validate',
+        files={'file': f},
+        data={
+            'return_annotated': True,
+            'validation_preset': 'strict'
+        }
+    )
+
+# Custom validation configuration
+with open('photo.jpg', 'rb') as f:
+    response = requests.post(
+        'http://localhost:8000/validate',
+        files={'file': f},
+        data={
+            'validation_preset': 'custom',
+            'face_sizing': True,
+            'eye_validation': True,
+            'landmark_analysis': False,
+            'obstruction_detection': False,
+            'mouth_validation': False,
+            'quality_assessment': True,
+            'return_annotated': True
+        }
+    )
+    result = response.json()
+    print(f"Valid: {result['is_valid']}")
+```
+
+## Validation Criteria
+
+The system validates photos against configurable criteria organized into categories:
+
+### Core Requirements (Always Active)
+
+- **File Handling**: JPEG, PNG, or other common image formats
+- **Face Detection**: Must detect exactly one face with ≥85% confidence
+
+### Configurable Validation Categories
+
+#### Face Sizing
+
+- Face must occupy 5-80% of the total image area
+- Ensures proper framing for ID photo standards
+
+#### Landmark Analysis
+
+- All 68 facial landmarks must be detectable
+- Facial symmetry and landmark distribution checks
+- Nose bridge continuity validation
+- Landmark clustering analysis
+
+#### Eye Validation
+
+- Both eyes must be open (Eye Aspect Ratio ≥ 0.25)
+- Advanced EAR calculation for accurate closed eye detection
+
+#### Obstruction Detection
+
+- Face must not be covered by hands or objects
+- Skin color analysis (≥40% skin visible in face region)
+- HSV color space analysis for obstruction detection
+
+#### Mouth Validation
+
+- Mouth area must be clearly visible
+- Proper mouth positioning checks
+
+#### Quality Assessment
+
+- Image must not be a cartoon or drawing
+- Color complexity analysis using KMeans clustering
+- Image quality and clarity validation
+
+## Project Structure
 
 ```
 protrait-validation-OpenCVYOLO/
-├── main.py                    # Application entry point
-├── requirements.txt           # Python dependencies
-├── README.md                 # This file
-├── id_validator/             # Main package
+├── main.py                    # GUI application entry point
+├── api.py                     # FastAPI REST API application
+├── start_api.py              # API server startup script
+├── api_client_example.py     # API usage examples
+├── requirements.txt          # Python dependencies
+├── README.md                 # This documentation
+├── id_validator/             # Main validation package
 │   ├── __init__.py           # Package initialization
 │   ├── config.py             # Configuration constants
-│   ├── utils.py              # Utility functions (model downloader)
+│   ├── utils.py              # Utility functions
 │   ├── validator.py          # Core validation logic
+│   ├── validation_config.py  # Validation configuration classes
+│   ├── models.py             # Pydantic models for API
 │   └── gui.py                # GUI application
 ├── models/                   # AI model files (auto-downloaded)
 │   ├── deploy.prototxt       # Face detection model architecture
@@ -76,97 +214,39 @@ protrait-validation-OpenCVYOLO/
 └── venv/                     # Virtual environment (if created)
 ```
 
-## 🔧 Configuration
+## Technical Details
 
-The application uses several configurable parameters in `id_validator/config.py`:
+### Validation Architecture
 
-```python
-# Face size requirements (as percentage of total image area)
-MIN_FACE_SIZE_RATIO = 0.05  # 5%
-MAX_FACE_SIZE_RATIO = 0.80  # 80%
+- **Modular Design**: Configurable validation categories
+- **Preset Configurations**: Strict, Basic, and Lenient modes
+- **Custom Configuration**: Individual control over validation rules
 
-# Face detection confidence threshold
-MIN_FACE_CONFIDENCE = 0.8   # 80%
+### Models Used
 
-# Cartoon detection sensitivity
-CARTOON_THRESHOLD = 12
-```
+- **Face Detection**: OpenCV DNN with Caffe SSD MobileNet
+- **Landmark Detection**: LBF (Local Binary Features) 68-point model
+- **Eye Analysis**: Eye Aspect Ratio (EAR) calculation
+- **Quality Assessment**: KMeans clustering for cartoon detection
+- **Skin Detection**: HSV color space analysis
 
-## 📖 Usage
+### Configuration System
 
-### GUI Application
+- `ValidationConfig` class for flexible validation control
+- Preset configurations: `STRICT_CONFIG`, `BASIC_CONFIG`, `LENIENT_CONFIG`
+- Runtime configuration through GUI checkboxes or API parameters
 
-1. **Activate virtual environment**:
+### Dependencies
 
-   ```bash
-   venv\Scripts\activate
-   ```
+- OpenCV (cv2) with contrib modules
+- NumPy for numerical operations
+- scikit-learn for KMeans clustering
+- Tkinter for GUI (included with Python)
+- FastAPI and Uvicorn for REST API
+- Pillow for image handling
+- Requests for HTTP operations
 
-2. **Run the GUI application**:
-
-   ```bash
-   python main.py
-   ```
-
-3. **Upload and validate**: Click "Upload Image" → Select photo → Click "Validate Photo"
-
-**Supported formats**: JPG, PNG, BMP, TIFF
-
-### REST API
-
-1. **Activate virtual environment**:
-
-   ```bash
-   venv\Scripts\activate
-   ```
-
-2. **Start API server**:
-
-   ```bash
-   python start_api.py
-   ```
-
-3. **Access API**:
-   - **Interactive Docs**: http://localhost:8000/docs
-   - **Health Check**: http://localhost:8000/health
-
-#### Key Endpoints
-
-- **POST `/validate`** - Upload image file for validation
-- **POST `/validate-base64`** - Validate base64 encoded image
-- **GET `/health`** - Check API status
-
-**Response format:**
-
-```json
-{
-  "is_valid": true,
-  "reasons": [],
-  "processing_time": 1.23
-}
-```
-
-#### Quick Test
-
-**Python:**
-
-```python
-import requests
-
-# Validate image
-with open("photo.jpg", "rb") as f:
-    files = {"file": f}
-    response = requests.post("http://localhost:8000/validate", files=files)
-    print(response.json())
-```
-
-**cURL:**
-
-```bash
-curl -X POST "http://localhost:8000/validate" -F "file=@photo.jpg"
-```
-
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Model Download Issues
 
@@ -178,26 +258,7 @@ If models fail to download automatically:
    - [res10_300x300_ssd_iter_140000.caffemodel](https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel)
    - [lbfmodel.yaml](https://github.com/spmallick/GSOC2017/raw/master/data/lbfmodel.yaml)
 
-## 🔬 Technical Details
-
-### AI Models Used
-
-1. **Face Detection**: OpenCV DNN with Caffe SSD MobileNet
-2. **Facial Landmarks**: LBF (Local Binary Features) model with 68-point detection
-3. **Color Analysis**: K-means clustering for cartoon detection
-4. **Skin Detection**: HSV color space analysis
-
-### Processing Pipeline
-
-1. Image loading and validation
-2. Face detection using deep neural network
-3. Face size and confidence validation
-4. Facial landmark detection (68 points)
-5. Advanced obstruction analysis
-6. Skin color and symmetry checks
-7. Quality assessment and final decision
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 

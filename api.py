@@ -17,6 +17,7 @@ from PIL import Image
 
 from id_validator.validator import validate_id_photo
 from id_validator.models import ValidationResponse, ValidationRequest, HealthResponse, ErrorResponse
+from id_validator.validation_config import ValidationConfig, STRICT_CONFIG, BASIC_CONFIG, LENIENT_CONFIG
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -89,7 +90,13 @@ async def health_check():
 async def validate_photo(
     file: UploadFile = File(..., description="Image file to validate"),
     return_annotated: bool = Form(default=False, description="Return annotated image"),
-    strict_mode: bool = Form(default=True, description="Use strict validation criteria")
+    validation_preset: str = Form(default="strict", description="Validation preset: strict, basic, or lenient"),
+    face_sizing: bool = Form(default=True, description="Enable face sizing validation"),
+    landmark_analysis: bool = Form(default=True, description="Enable landmark analysis"),
+    eye_validation: bool = Form(default=True, description="Enable eye validation"),
+    obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
+    mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
+    quality_assessment: bool = Form(default=True, description="Enable quality assessment")
 ):
     """
     Validate an ID photo for compliance with standard requirements.
@@ -128,11 +135,30 @@ async def validate_photo(
             temp_file.write(file_content)
             temp_path = temp_file.name
         
+        # Create validation configuration
+        if validation_preset.lower() == "strict":
+            config = STRICT_CONFIG
+        elif validation_preset.lower() == "basic":
+            config = BASIC_CONFIG
+        elif validation_preset.lower() == "lenient":
+            config = LENIENT_CONFIG
+        else:
+            # Custom configuration from individual parameters
+            config = ValidationConfig(
+                face_sizing=face_sizing,
+                landmark_analysis=landmark_analysis,
+                eye_validation=eye_validation,
+                obstruction_detection=obstruction_detection,
+                mouth_validation=mouth_validation,
+                quality_assessment=quality_assessment
+            )
+        
         # Perform validation
         start_time = time.time()
         is_valid, reasons, annotated_image = validate_id_photo(
             temp_path, 
-            return_annotated=return_annotated
+            return_annotated=return_annotated,
+            config=config
         )
         processing_time = time.time() - start_time
         
@@ -186,7 +212,13 @@ async def validate_photo(
 async def validate_photo_base64(
     image_data: str = Form(..., description="Base64 encoded image data"),
     return_annotated: bool = Form(default=False, description="Return annotated image"),
-    strict_mode: bool = Form(default=True, description="Use strict validation criteria")
+    validation_preset: str = Form(default="strict", description="Validation preset: strict, basic, or lenient"),
+    face_sizing: bool = Form(default=True, description="Enable face sizing validation"),
+    landmark_analysis: bool = Form(default=True, description="Enable landmark analysis"),
+    eye_validation: bool = Form(default=True, description="Enable eye validation"),
+    obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
+    mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
+    quality_assessment: bool = Form(default=True, description="Enable quality assessment")
 ):
     """
     Validate an ID photo from base64 encoded image data.
@@ -223,11 +255,30 @@ async def validate_photo_base64(
             temp_file.write(image_bytes)
             temp_path = temp_file.name
         
+        # Create validation configuration
+        if validation_preset.lower() == "strict":
+            config = STRICT_CONFIG
+        elif validation_preset.lower() == "basic":
+            config = BASIC_CONFIG
+        elif validation_preset.lower() == "lenient":
+            config = LENIENT_CONFIG
+        else:
+            # Custom configuration from individual parameters
+            config = ValidationConfig(
+                face_sizing=face_sizing,
+                landmark_analysis=landmark_analysis,
+                eye_validation=eye_validation,
+                obstruction_detection=obstruction_detection,
+                mouth_validation=mouth_validation,
+                quality_assessment=quality_assessment
+            )
+        
         # Perform validation
         start_time = time.time()
         is_valid, reasons, annotated_image = validate_id_photo(
             temp_path, 
-            return_annotated=return_annotated
+            return_annotated=return_annotated,
+            config=config
         )
         processing_time = time.time() - start_time
         

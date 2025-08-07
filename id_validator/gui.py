@@ -16,6 +16,7 @@ from .config import (
 )
 from .utils import download_file
 from .validator import validate_id_photo
+from .validation_config import ValidationConfig, STRICT_CONFIG, BASIC_CONFIG, LENIENT_CONFIG
 
 class IDPhotoValidatorGUI:
     """
@@ -27,8 +28,17 @@ class IDPhotoValidatorGUI:
         self.root.geometry("1200x800")
         self.root.configure(bg="#f0f0f0")
 
-        self.current_image_path: str = ""
+        self.current_image_path = None
         self.models_downloading = False
+        self.validation_config = ValidationConfig()  # Default config
+        
+        # Validation configuration variables
+        self.face_sizing_var = tk.BooleanVar(value=True)
+        self.landmark_analysis_var = tk.BooleanVar(value=True)
+        self.eye_validation_var = tk.BooleanVar(value=True)
+        self.obstruction_detection_var = tk.BooleanVar(value=True)
+        self.mouth_validation_var = tk.BooleanVar(value=True)
+        self.quality_assessment_var = tk.BooleanVar(value=True)
 
         self._setup_styles()
         self._create_widgets()
@@ -46,7 +56,18 @@ class IDPhotoValidatorGUI:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # --- Left Panel: Image Upload and Display ---
-        left_panel = ttk.Frame(main_frame, width=600)
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Configuration frame (middle)
+        config_frame = ttk.Frame(main_frame)
+        config_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+
+        # --- Left Panel: Image Upload and Display ---
+        left_panel = ttk.Frame(left_frame, width=600)
         left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         ttk.Label(left_panel, text="Original Photo", style="Header.TLabel").pack(pady=10)
@@ -62,8 +83,11 @@ class IDPhotoValidatorGUI:
         self.validate_btn = ttk.Button(btn_frame, text="Validate Photo", command=self.validate_image, state=tk.DISABLED)
         self.validate_btn.pack(side=tk.RIGHT, expand=True, padx=5)
 
+        # --- Configuration Panel ---
+        self.setup_config_panel(config_frame)
+
         # --- Right Panel: Validation Results ---
-        right_panel = ttk.Frame(main_frame, width=600)
+        right_panel = ttk.Frame(right_frame, width=600)
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
         ttk.Label(right_panel, text="Validation Results", style="Header.TLabel").pack(pady=10)
@@ -132,7 +156,7 @@ class IDPhotoValidatorGUI:
 
         start_time = time.time()
         try:
-            is_valid, reasons, annotated_img = validate_id_photo(self.current_image_path, return_annotated=True)
+            is_valid, reasons, annotated_img = validate_id_photo(self.current_image_path, return_annotated=True, config=self.validation_config)
             end_time = time.time()
             processing_time = end_time - start_time
 
@@ -186,3 +210,110 @@ class IDPhotoValidatorGUI:
         self.result_text.delete(1.0, tk.END)
         self.result_text.insert(tk.END, message, tag)
         self.result_text.config(state=tk.DISABLED)
+    
+    def setup_config_panel(self, parent):
+        """Setup the validation configuration panel."""
+        # Configuration panel header
+        config_label = ttk.Label(parent, text="Validation Settings", font=("Arial", 12, "bold"))
+        config_label.pack(pady=(0, 10))
+        
+        # Preset configurations frame
+        preset_frame = ttk.LabelFrame(parent, text="Presets", padding=10)
+        preset_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(preset_frame, text="Strict (All)", command=self.apply_strict_config).pack(fill=tk.X, pady=2)
+        ttk.Button(preset_frame, text="Basic", command=self.apply_basic_config).pack(fill=tk.X, pady=2)
+        ttk.Button(preset_frame, text="Lenient", command=self.apply_lenient_config).pack(fill=tk.X, pady=2)
+        
+        # Individual validation categories
+        categories_frame = ttk.LabelFrame(parent, text="Validation Categories", padding=10)
+        categories_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Core validations (always enabled)
+        ttk.Label(categories_frame, text="Core (Always On):", font=("Arial", 9, "bold")).pack(anchor=tk.W)
+        ttk.Label(categories_frame, text="• File Handling", foreground="gray").pack(anchor=tk.W, padx=10)
+        ttk.Label(categories_frame, text="• Face Detection", foreground="gray").pack(anchor=tk.W, padx=10)
+        
+        ttk.Separator(categories_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Configurable validations
+        ttk.Label(categories_frame, text="Configurable:", font=("Arial", 9, "bold")).pack(anchor=tk.W)
+        
+        ttk.Checkbutton(categories_frame, text="Face Sizing", variable=self.face_sizing_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Landmark Analysis", variable=self.landmark_analysis_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Eye Validation", variable=self.eye_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Obstruction Detection", variable=self.obstruction_detection_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Mouth Validation", variable=self.mouth_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Quality Assessment", variable=self.quality_assessment_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        # Current config display
+        self.config_status_label = ttk.Label(parent, text="", font=("Arial", 8), foreground="blue")
+        self.config_status_label.pack(pady=(10, 0))
+        
+        # Update initial status
+        self.update_config_status()
+    
+    def apply_strict_config(self):
+        """Apply strict validation configuration."""
+        self.face_sizing_var.set(True)
+        self.landmark_analysis_var.set(True)
+        self.eye_validation_var.set(True)
+        self.obstruction_detection_var.set(True)
+        self.mouth_validation_var.set(True)
+        self.quality_assessment_var.set(True)
+        self.update_config()
+    
+    def apply_basic_config(self):
+        """Apply basic validation configuration."""
+        self.face_sizing_var.set(True)
+        self.landmark_analysis_var.set(False)
+        self.eye_validation_var.set(True)
+        self.obstruction_detection_var.set(False)
+        self.mouth_validation_var.set(False)
+        self.quality_assessment_var.set(False)
+        self.update_config()
+    
+    def apply_lenient_config(self):
+        """Apply lenient validation configuration."""
+        self.face_sizing_var.set(False)
+        self.landmark_analysis_var.set(False)
+        self.eye_validation_var.set(False)
+        self.obstruction_detection_var.set(False)
+        self.mouth_validation_var.set(False)
+        self.quality_assessment_var.set(False)
+        self.update_config()
+    
+    def update_config(self):
+        """Update the validation configuration based on checkbox states."""
+        self.validation_config = ValidationConfig(
+            face_sizing=self.face_sizing_var.get(),
+            landmark_analysis=self.landmark_analysis_var.get(),
+            eye_validation=self.eye_validation_var.get(),
+            obstruction_detection=self.obstruction_detection_var.get(),
+            mouth_validation=self.mouth_validation_var.get(),
+            quality_assessment=self.quality_assessment_var.get()
+        )
+        self.update_config_status()
+    
+    def update_config_status(self):
+        """Update the configuration status display."""
+        enabled = self.validation_config.get_enabled_categories()
+        if len(enabled) == 6:
+            status = "Strict Mode (All)"
+        elif len(enabled) == 0:
+            status = "Lenient Mode (Core Only)"
+        else:
+            status = f"Custom ({len(enabled)}/6 enabled)"
+        
+        self.config_status_label.config(text=f"Current: {status}")
