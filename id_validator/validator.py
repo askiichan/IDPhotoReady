@@ -10,7 +10,11 @@ from typing import Tuple, List, Optional, Dict, Any
 
 from .config import (
     FACE_PROTO, FACE_MODEL, LANDMARK_MODEL,
-    MIN_FACE_CONFIDENCE, MIN_FACE_SIZE_RATIO, MAX_FACE_SIZE_RATIO, CARTOON_THRESHOLD
+    MIN_FACE_SIZE_RATIO, MAX_FACE_SIZE_RATIO, MIN_FACE_CONFIDENCE,
+    CARTOON_THRESHOLD, EAR_THRESHOLD,
+    MIN_SKIN_PERCENTAGE, MAX_UNIFORM_BLOCK_RATIO, UNIFORM_COLOR_STD_THRESHOLD,
+    MIN_EDGE_DENSITY, MIN_COLOR_VARIANCE, MAX_DARK_PIXEL_RATIO, MAX_BRIGHT_PIXEL_RATIO,
+    DARK_PIXEL_THRESHOLD, BRIGHT_PIXEL_THRESHOLD
 )
 from .validation_config import ValidationConfig, DEFAULT_CONFIG
 
@@ -44,7 +48,7 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
 
     # Use default config if none provided
     if config is None:
-        config = DEFAULT_CONFIG
+        config = ValidationConfig()
 
     reasons = []
     annotated_image = None
@@ -106,21 +110,93 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
             if len(np.unique(kmeans.labels_)) < CARTOON_THRESHOLD / 2:
                 reasons.append("Image appears to be a cartoon or drawing due to low color complexity.")
         
-        # Obstruction Detection - Hand/Skin color detection
+        # Enhanced Obstruction Detection
         if config.obstruction_detection:
             face_roi_hsv = cv2.cvtColor(face_roi, cv2.COLOR_BGR2HSV)
+            face_roi_gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
             
-            # Define skin color range in HSV
+            # 1. Skin color detection
             lower_skin = np.array([0, 20, 70], dtype=np.uint8)
             upper_skin = np.array([20, 255, 255], dtype=np.uint8)
             skin_mask = cv2.inRange(face_roi_hsv, lower_skin, upper_skin)
-            
-            # Calculate skin percentage in face region
             skin_percentage = np.sum(skin_mask > 0) / (face_roi.shape[0] * face_roi.shape[1])
             
-            # If too little skin is visible, face might be covered
-            if skin_percentage < 0.4:  # Less than 40% skin visible
-                reasons.append(f"Insufficient skin visible in face region ({skin_percentage:.1%}). Face may be covered by hands or objects.")
+            # 2. Detect uniform color blocks (artificial obstructions)
+            # Check for large areas of uniform color that shouldn't be in a natural face
+            face_roi_blur = cv2.GaussianBlur(face_roi_gray, (5, 5), 0)
+            _, binary = cv2.threshold(face_roi_blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Find contours of uniform regions
+            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # Check for large uniform blocks (like black rectangles)
+            face_area_roi = face_roi.shape[0] * face_roi.shape[1]
+            large_uniform_blocks = 0
+            
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                # If a uniform block covers more than threshold of face area, it's suspicious
+                if area > MAX_UNIFORM_BLOCK_RATIO * face_area_roi:
+                    # Check if it's a very uniform color (low standard deviation)
+                    mask = np.zeros(face_roi_gray.shape, np.uint8)
+                    cv2.fillPoly(mask, [contour], 255)
+                    masked_region = cv2.bitwise_and(face_roi_gray, face_roi_gray, mask=mask)
+                    non_zero_pixels = masked_region[masked_region > 0]
+                    
+                    if len(non_zero_pixels) > 0:
+                        color_std = np.std(non_zero_pixels)
+                        # Very low standard deviation indicates uniform color (artificial obstruction)
+                        if color_std < UNIFORM_COLOR_STD_THRESHOLD:
+                            large_uniform_blocks += 1
+            
+            # 3. Edge density analysis - natural faces have more edges than artificial obstructions
+            edges = cv2.Canny(face_roi_gray, 50, 150)
+            edge_density = np.sum(edges > 0) / (face_roi.shape[0] * face_roi.shape[1])
+            
+            # 4. Color variance analysis - natural faces have more color variation
+            color_variance = np.var(face_roi_gray)
+            
+            # 5. Detect very dark or very bright regions (common in artificial obstructions)
+            very_dark_pixels = np.sum(face_roi_gray < DARK_PIXEL_THRESHOLD) / face_area_roi
+            very_bright_pixels = np.sum(face_roi_gray > BRIGHT_PIXEL_THRESHOLD) / face_area_roi
+            
+            # Apply obstruction detection rules
+            obstruction_detected = False
+            obstruction_reasons = []
+            
+            # Rule 1: Insufficient skin visible
+            if skin_percentage < MIN_SKIN_PERCENTAGE:
+                obstruction_detected = True
+                obstruction_reasons.append(f"insufficient skin visible ({skin_percentage:.1%})")
+            
+            # Rule 2: Large uniform color blocks detected
+            if large_uniform_blocks > 0:
+                obstruction_detected = True
+                obstruction_reasons.append(f"artificial uniform color blocks detected ({large_uniform_blocks} blocks)")
+            
+            # Rule 3: Very low edge density (too smooth/artificial)
+            if edge_density < MIN_EDGE_DENSITY:
+                obstruction_detected = True
+                obstruction_reasons.append(f"unnaturally smooth surface detected (edge density: {edge_density:.3f})")
+            
+            # Rule 4: Very low color variance (too uniform)
+            if color_variance < MIN_COLOR_VARIANCE:
+                obstruction_detected = True
+                obstruction_reasons.append(f"unnaturally uniform coloring detected (variance: {color_variance:.1f})")
+            
+            # Rule 5: Excessive dark or bright regions
+            if very_dark_pixels > MAX_DARK_PIXEL_RATIO:
+                obstruction_detected = True
+                obstruction_reasons.append(f"excessive dark regions detected ({very_dark_pixels:.1%})")
+            
+            if very_bright_pixels > MAX_BRIGHT_PIXEL_RATIO:
+                obstruction_detected = True
+                obstruction_reasons.append(f"excessive bright regions detected ({very_bright_pixels:.1%})")
+            
+            # Report obstruction if detected
+            if obstruction_detected:
+                reason_text = ", ".join(obstruction_reasons)
+                reasons.append(f"Face obstruction detected: {reason_text}. Face may be covered by hands, objects, or artificial elements.")
 
     # Always draw the face rectangle if we have an annotated image
     if annotated_image is not None:

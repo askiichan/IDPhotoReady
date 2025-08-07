@@ -30,6 +30,20 @@ LANDMARK_MODEL_URL = "https://github.com/kurnianggoro/GSOC2017/raw/master/data/l
 MIN_FACE_SIZE_RATIO = 0.05  # 5% of the image area
 MAX_FACE_SIZE_RATIO = 0.80  # 80% of the image area
 
+# Eye Aspect Ratio threshold for closed eye detection
+EAR_THRESHOLD = 0.25
+
+# Enhanced Obstruction Detection Parameters
+MIN_SKIN_PERCENTAGE = 0.4  # Minimum skin percentage required
+MAX_UNIFORM_BLOCK_RATIO = 0.15  # Maximum ratio of face area that can be uniform color
+UNIFORM_COLOR_STD_THRESHOLD = 15  # Standard deviation threshold for uniform color detection
+MIN_EDGE_DENSITY = 0.02  # Minimum edge density for natural faces
+MIN_COLOR_VARIANCE = 100  # Minimum color variance for natural faces
+MAX_DARK_PIXEL_RATIO = 0.2  # Maximum ratio of very dark pixels
+MAX_BRIGHT_PIXEL_RATIO = 0.2  # Maximum ratio of very bright pixels
+DARK_PIXEL_THRESHOLD = 30  # Pixel value threshold for "very dark"
+BRIGHT_PIXEL_THRESHOLD = 220  # Pixel value threshold for "very bright"
+
 # Confidence threshold for face detection (increased for ID photos)
 MIN_FACE_CONFIDENCE = 0.8
 
