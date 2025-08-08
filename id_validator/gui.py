@@ -84,6 +84,20 @@ class IDPhotoValidatorGUI:
         self.validate_btn = ttk.Button(btn_frame, text="Validate Photo", command=self.validate_image, state=tk.DISABLED)
         self.validate_btn.pack(side=tk.RIGHT, expand=True, padx=5)
 
+        # Batch processing button
+        self.batch_btn = ttk.Button(left_panel, text="Batch Process Folder", command=self.process_folder)
+        self.batch_btn.pack(pady=10, fill=tk.X)
+
+        # Progress bar for batch processing
+        self.progress_frame = ttk.Frame(left_panel)
+        self.progress_frame.pack(pady=10, fill=tk.X)
+        
+        self.progress_label = ttk.Label(self.progress_frame, text="")
+        self.progress_label.pack()
+        
+        self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
+        self.progress_bar.pack(fill=tk.X, pady=5)
+
         # --- Configuration Panel ---
         self.setup_config_panel(config_frame)
 
@@ -96,12 +110,17 @@ class IDPhotoValidatorGUI:
         self.result_image_label.pack(fill=tk.BOTH, expand=True)
 
         self.result_text = tk.Text(right_panel, height=10, wrap=tk.WORD, font=("Helvetica", 11), relief="flat", bg="#ffffff")
-        self.result_text.pack(pady=10, fill=tk.X)
+        self.result_text.pack(pady=10, fill=tk.BOTH, expand=True)
         self.result_text.tag_configure("success", foreground="#28a745", font=("Helvetica", 12, "bold"))
         self.result_text.tag_configure("failure", foreground="#dc3545", font=("Helvetica", 12, "bold"))
         self.result_text.tag_configure("reason", foreground="#6c757d", font=("Helvetica", 11))
         self.result_text.tag_configure("time", foreground="#17a2b8", font=("Helvetica", 10, "italic"))
         self.result_text.config(state=tk.DISABLED)
+
+        # Add scrollbar to results text
+        scrollbar = ttk.Scrollbar(right_panel, orient=tk.VERTICAL, command=self.result_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.result_text.config(yscrollcommand=scrollbar.set)
 
     def _check_and_download_models(self):
         models_to_check = {
@@ -171,6 +190,133 @@ class IDPhotoValidatorGUI:
         except Exception as e:
             end_time = time.time()
             self.display_results(False, [f"An unexpected error occurred: {e}"], end_time - start_time)
+
+    def process_folder(self):
+        """Process all images in a selected folder."""
+        if self.models_downloading:
+            self.show_result_message("Please wait for models to finish downloading.", "failure")
+            return
+
+        folder_path = filedialog.askdirectory()
+        if not folder_path:
+            return
+
+        # Get all image files in the folder
+        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp')
+        image_files = [f for f in os.listdir(folder_path) 
+                      if f.lower().endswith(image_extensions) and 
+                      os.path.isfile(os.path.join(folder_path, f))]
+
+        if not image_files:
+            self.show_result_message("No image files found in the selected folder.", "failure")
+            return
+
+        # Disable buttons during processing
+        self.upload_btn.config(state=tk.DISABLED)
+        self.validate_btn.config(state=tk.DISABLED)
+        self.batch_btn.config(state=tk.DISABLED)
+
+        # Start batch processing in a separate thread
+        batch_thread = threading.Thread(target=self._batch_process_worker, 
+                                       args=(folder_path, image_files), daemon=True)
+        batch_thread.start()
+
+    def _batch_process_worker(self, folder_path, image_files):
+        """Worker function for batch processing."""
+        try:
+            # Initialize results tracking
+            total_files = len(image_files)
+            passed_count = 0
+            failed_count = 0
+            results = []
+            
+            # Process each image
+            for i, filename in enumerate(image_files):
+                file_path = os.path.join(folder_path, filename)
+                
+                # Update progress
+                self.progress_label.config(text=f"Processing: {filename}")
+                self.progress_bar['value'] = (i / total_files) * 100
+                self.root.update_idletasks()
+                
+                # Validate image
+                try:
+                    start_time = time.time()
+                    is_valid, reasons, _ = validate_id_photo(file_path, return_annotated=False, config=self.validation_config)
+                    end_time = time.time()
+                    processing_time = end_time - start_time
+                    
+                    results.append({
+                        'filename': filename,
+                        'passed': is_valid,
+                        'reasons': reasons,
+                        'time': processing_time
+                    })
+                    
+                    if is_valid:
+                        passed_count += 1
+                    else:
+                        failed_count += 1
+                        
+                except Exception as e:
+                    results.append({
+                        'filename': filename,
+                        'passed': False,
+                        'reasons': [f"Error: {str(e)}"],
+                        'time': 0
+                    })
+                    failed_count += 1
+            
+            # Complete progress bar
+            self.progress_bar['value'] = 100
+            self.progress_label.config(text="Processing complete!")
+            
+            # Display batch results
+            self.display_batch_results(results, total_files, passed_count, failed_count)
+            
+        except Exception as e:
+            self.show_result_message(f"Batch processing failed: {str(e)}", "failure")
+        finally:
+            # Re-enable buttons
+            self.upload_btn.config(state=tk.NORMAL)
+            self.validate_btn.config(state=tk.NORMAL)
+            self.batch_btn.config(state=tk.NORMAL)
+            
+            # Reset progress after a delay
+            self.root.after(3000, self._reset_progress)
+
+    def _reset_progress(self):
+        """Reset progress bar and label after processing."""
+        self.progress_bar['value'] = 0
+        self.progress_label.config(text="")
+
+    def display_batch_results(self, results, total_files, passed_count, failed_count):
+        """Display results for batch processing."""
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        
+        # Summary
+        self.result_text.insert(tk.END, f"Batch Processing Complete\n", "success")
+        self.result_text.insert(tk.END, f"Total files processed: {total_files}\n", "reason")
+        self.result_text.insert(tk.END, f"Passed: {passed_count}\n", "success")
+        self.result_text.insert(tk.END, f"Failed: {failed_count}\n\n", "failure")
+        
+        # Detailed results
+        self.result_text.insert(tk.END, "Detailed Results:\n", "reason")
+        self.result_text.insert(tk.END, "-" * 40 + "\n")
+        
+        for result in results:
+            status = "PASSED" if result['passed'] else "FAILED"
+            tag = "success" if result['passed'] else "failure"
+            self.result_text.insert(tk.END, f"{result['filename']}: {status}\n", tag)
+            
+            if not result['passed']:
+                for reason in result['reasons']:
+                    self.result_text.insert(tk.END, f"  - {reason}\n", "reason")
+            
+            self.result_text.insert(tk.END, f"  Processing time: {result['time']:.2f} seconds\n\n", "time")
+        
+        self.result_text.config(state=tk.DISABLED)
 
     def display_image(self, label, image_source, is_cv2_img=False):
         try:
