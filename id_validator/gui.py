@@ -5,7 +5,7 @@ GUI for the ID Photo Validator application.
 import os
 import tkinter as tk
 import cv2
-from tkinter import filedialog, ttk
+from tkinter import filedialog, ttk, messagebox
 import threading
 import time
 from PIL import Image, ImageTk
@@ -70,70 +70,52 @@ class IDPhotoValidatorGUI:
         config_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
         main_paned.add(config_panel, weight=0)
         
-        # Middle panel for input image
-        left_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
-        main_paned.add(left_panel, weight=1)
-        
-        # Right panel for results
+        # Right panel with tabs for single validation and batch processing
         right_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
-        main_paned.add(right_panel, weight=1)
-        
-        # --- Left Panel: Image Upload and Display ---
-        ttk.Label(left_panel, text="Input Image", style="Header.TLabel").pack(pady=(10, 5))
-        self.image_label = ttk.Label(left_panel, text="Upload an image to begin", 
-                                    relief="solid", borderwidth=1, 
-                                    background="white", anchor="center")
-        self.image_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
-        # Button frame for input actions
-        input_btn_frame = ttk.Frame(left_panel)
-        input_btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
-        self.upload_btn = ttk.Button(input_btn_frame, text="Upload Image", command=self.upload_image)
-        self.upload_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
-        
-        self.validate_btn = ttk.Button(input_btn_frame, text="Validate Photo", 
-                                      command=self.validate_image, state=tk.DISABLED)
-        self.validate_btn.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(5, 0))
-        
-        # Batch processing button
-        self.batch_btn = ttk.Button(left_panel, text="Batch Process Folder", command=self.process_folder)
-        self.batch_btn.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
-        # Progress frame for batch processing
-        self.progress_frame = ttk.Frame(left_panel)
-        self.progress_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
-        self.progress_label = ttk.Label(self.progress_frame, text="", style="Info.TLabel")
-        self.progress_label.pack()
-        
-        self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
-        self.progress_bar.pack(fill=tk.X, pady=(5, 0))
+        main_paned.add(right_panel, weight=3)
         
         # --- Configuration Panel ---
         self.setup_config_panel(config_panel)
         
-        # --- Right Panel: Validation Results ---
-        # Create notebook for tabbed results interface
-        self.results_notebook = ttk.Notebook(right_panel)
-        self.results_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # --- Right Panel: Create notebook for tabs ---
+        self.main_notebook = ttk.Notebook(right_panel)
+        self.main_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Single validation tab
-        self.single_result_frame = ttk.Frame(self.results_notebook)
-        self.results_notebook.add(self.single_result_frame, text="Single Result")
+        # --- Tab 1: Single Image Validation ---
+        self.single_tab = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(self.single_tab, text="Single Image Validation")
         
-        # Batch validation tab
-        self.batch_result_frame = ttk.Frame(self.results_notebook)
-        self.results_notebook.add(self.batch_result_frame, text="Batch Results")
+        # Create paned window for single validation tab
+        single_paned = ttk.PanedWindow(self.single_tab, orient=tk.HORIZONTAL)
+        single_paned.pack(fill=tk.BOTH, expand=True)
         
-        # --- Single Result Tab ---
-        ttk.Label(self.single_result_frame, text="Validation Result", style="Header.TLabel").pack(pady=(10, 5))
-        self.result_image_label = ttk.Label(self.single_result_frame, text="Validation pending...", 
+        # Input panel
+        input_panel = ttk.Frame(single_paned, relief=tk.RAISED, borderwidth=1)
+        single_paned.add(input_panel, weight=1)
+        
+        # Results panel
+        result_panel = ttk.Frame(single_paned, relief=tk.RAISED, borderwidth=1)
+        single_paned.add(result_panel, weight=1)
+        
+        # Input image section
+        ttk.Label(input_panel, text="Input Image", style="Header.TLabel").pack(pady=(10, 5))
+        self.image_label = ttk.Label(input_panel, text="Upload an image to begin", 
+                                    relief="solid", borderwidth=1, 
+                                    background="white", anchor="center")
+        self.image_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        
+        # Button for image upload
+        self.upload_btn = ttk.Button(input_panel, text="Upload Image", command=self.upload_image)
+        self.upload_btn.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        # Results section
+        ttk.Label(result_panel, text="Validation Result", style="Header.TLabel").pack(pady=(10, 5))
+        self.result_image_label = ttk.Label(result_panel, text="Validation pending...", 
                                           relief="solid", borderwidth=1, 
                                           background="white", anchor="center")
         self.result_image_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
-        self.result_text = tk.Text(self.single_result_frame, height=10, wrap=tk.WORD, 
+        self.result_text = tk.Text(result_panel, height=10, wrap=tk.WORD, 
                                   font=("Segoe UI", 10), relief="flat", bg="#ffffff")
         self.result_text.pack(pady=(0, 10), padx=10, fill=tk.BOTH, expand=True)
         self.result_text.tag_configure("success", foreground="#27ae60", font=("Segoe UI", 11, "bold"))
@@ -143,14 +125,60 @@ class IDPhotoValidatorGUI:
         self.result_text.config(state=tk.DISABLED)
         
         # Add scrollbar to results text
-        single_scrollbar = ttk.Scrollbar(self.single_result_frame, orient=tk.VERTICAL, command=self.result_text.yview)
+        single_scrollbar = ttk.Scrollbar(result_panel, orient=tk.VERTICAL, command=self.result_text.yview)
         single_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.result_text.config(yscrollcommand=single_scrollbar.set)
         
-        # --- Batch Result Tab ---
+        # --- Tab 2: Batch Processing ---
+        self.batch_tab = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(self.batch_tab, text="Batch Processing")
+        
+        # Create paned window for batch tab
+        batch_paned = ttk.PanedWindow(self.batch_tab, orient=tk.VERTICAL)
+        batch_paned.pack(fill=tk.BOTH, expand=True)
+        
+        # Batch controls panel
+        batch_controls = ttk.Frame(batch_paned, relief=tk.RAISED, borderwidth=1)
+        batch_paned.add(batch_controls, weight=0)
+        
+        # Batch results panel
+        batch_results = ttk.Frame(batch_paned, relief=tk.RAISED, borderwidth=1)
+        batch_paned.add(batch_results, weight=1)
+        
+        # Batch processing controls
+        ttk.Label(batch_controls, text="Batch Processing", style="Header.TLabel").pack(pady=(10, 5))
+        
+        # Batch processing button
+        self.batch_btn = ttk.Button(batch_controls, text="Select Folder to Process", command=self.process_folder)
+        self.batch_btn.pack(fill=tk.X, padx=10, pady=(10, 10))
+        
+        # Progress frame for batch processing
+        self.progress_frame = ttk.Frame(batch_controls)
+        self.progress_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        self.progress_label = ttk.Label(self.progress_frame, text="", style="Info.TLabel")
+        self.progress_label.pack()
+        
+        self.progress_bar = ttk.Progressbar(self.progress_frame, mode='determinate')
+        self.progress_bar.pack(fill=tk.X, pady=(5, 10))
+        
+        # Filter options
+        filter_frame = ttk.Frame(batch_controls)
+        filter_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        # Add checkbox to filter results
+        self.show_failed_only_var = tk.BooleanVar(value=False)
+        self.show_failed_only_cb = ttk.Checkbutton(filter_frame, text="Show Failed Results Only", 
+                                                 variable=self.show_failed_only_var,
+                                                 command=self._update_batch_results_images)
+        self.show_failed_only_cb.pack(anchor=tk.W)
+        
+        # Batch results section
+        ttk.Label(batch_results, text="Batch Results", style="Header.TLabel").pack(pady=(10, 5))
+        
         # Create a canvas and scrollbar for batch results
-        self.batch_canvas = tk.Canvas(self.batch_result_frame, bg="#ffffff")
-        self.batch_scrollbar = ttk.Scrollbar(self.batch_result_frame, orient=tk.VERTICAL, command=self.batch_canvas.yview)
+        self.batch_canvas = tk.Canvas(batch_results, bg="#ffffff")
+        self.batch_scrollbar = ttk.Scrollbar(batch_results, orient=tk.VERTICAL, command=self.batch_canvas.yview)
         self.batch_scrollable_frame = ttk.Frame(self.batch_canvas)
         
         self.batch_canvas.configure(yscrollcommand=self.batch_scrollbar.set)
@@ -208,14 +236,19 @@ class IDPhotoValidatorGUI:
 
         self.current_image_path = path
         self.display_image(self.image_label, path)
-        self.validate_btn.config(state=tk.NORMAL)
-        self.show_result_message("Image loaded. Click 'Validate Photo' to proceed.", "reason")
+        self.show_result_message("Image loaded. Validating...", "reason")
         self.result_image_label.configure(image='')
         self.result_image_label.image = None
+        
+        # Automatically validate the image
+        self.validate_image()
 
     def validate_image(self):
         if not self.current_image_path:
             return
+
+        # Make sure we're on the single image validation tab
+        self.main_notebook.select(self.single_tab)
 
         start_time = time.time()
         try:
@@ -240,6 +273,9 @@ class IDPhotoValidatorGUI:
             self.show_result_message("Please wait for models to finish downloading.", "failure")
             return
 
+        # Make sure we're on the batch processing tab
+        self.main_notebook.select(self.batch_tab)
+        
         folder_path = filedialog.askdirectory()
         if not folder_path:
             return
@@ -256,7 +292,6 @@ class IDPhotoValidatorGUI:
 
         # Disable buttons during processing
         self.upload_btn.config(state=tk.DISABLED)
-        self.validate_btn.config(state=tk.DISABLED)
         self.batch_btn.config(state=tk.DISABLED)
 
         # Start batch processing in a separate thread
@@ -326,7 +361,6 @@ class IDPhotoValidatorGUI:
         finally:
             # Re-enable buttons
             self.upload_btn.config(state=tk.NORMAL)
-            self.validate_btn.config(state=tk.NORMAL)
             self.batch_btn.config(state=tk.NORMAL)
             
             # Reset progress after a delay
@@ -339,40 +373,30 @@ class IDPhotoValidatorGUI:
 
     def display_batch_results(self, results, total_files, passed_count, failed_count):
         """Display results for batch processing."""
-        # Store results for navigation
         self.batch_results = results
         self.current_batch_index = 0
         
-        # Update text results
-        self.result_text.config(state=tk.NORMAL)
-        self.result_text.delete(1.0, tk.END)
+        # Switch to batch processing tab
+        self.main_notebook.select(self.batch_tab)
         
-        # Summary
-        self.result_text.insert(tk.END, f"Batch Processing Complete\n", "success")
-        self.result_text.insert(tk.END, f"Total files processed: {total_files}\n", "reason")
-        self.result_text.insert(tk.END, f"Passed: {passed_count}\n", "success")
-        self.result_text.insert(tk.END, f"Failed: {failed_count}\n\n", "failure")
+        # Update progress label with summary
+        summary = f"Processed {total_files} files: {passed_count} passed, {failed_count} failed"
+        self.progress_label.config(text=summary, 
+                                  foreground="#27ae60" if failed_count == 0 else "#e74c3c")
         
-        # Detailed results
-        self.result_text.insert(tk.END, "Detailed Results:\n", "reason")
-        self.result_text.insert(tk.END, "-" * 40 + "\n")
-        
-        for result in results:
-            status = "PASSED" if result['passed'] else "FAILED"
-            tag = "success" if result['passed'] else "failure"
-            self.result_text.insert(tk.END, f"{result['filename']}: {status}\n", tag)
+        # If there are failed results, suggest using the filter
+        if failed_count > 0:
+            # Reset filter to show all results first
+            self.show_failed_only_var.set(False)
             
-            if not result['passed']:
-                for reason in result['reasons']:
-                    self.result_text.insert(tk.END, f"  - {reason}\n", "reason")
+            # Update batch results tab with images
+            self._update_batch_results_images()
             
-            self.result_text.insert(tk.END, f"  Processing time: {result['time']:.2f} seconds\n\n", "time")
-        
-        self.result_text.config(state=tk.DISABLED)
-        
-        # Update batch results tab with images
-        self._update_batch_results_images()
-        
+            # Filter is available but no pop-up is shown
+        else:
+            # Update batch results tab with images
+            self._update_batch_results_images()
+
     def display_image(self, label, image_source, is_cv2_img=False):
         """Display an image in a label with proper sizing and aspect ratio."""
         try:
@@ -565,14 +589,183 @@ class IDPhotoValidatorGUI:
         
         self.config_status_label.config(text=f"Current: {status}")
     
+    def display_results(self, is_valid, reasons, duration):
+        """Display validation results in the result text area."""
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        
+        if is_valid:
+            self.result_text.insert(tk.END, "Validation Passed!\n", "success")
+            self.result_text.insert(tk.END, "The photo meets all requirements.", "reason")
+        else:
+            self.result_text.insert(tk.END, "Validation Failed\n", "failure")
+            for reason in reasons:
+                self.result_text.insert(tk.END, f"- {reason}\n", "reason")
+        
+        self.result_text.insert(tk.END, f"\n\nProcessing time: {duration:.2f} seconds", "time")
+        self.result_text.config(state=tk.DISABLED)
+
+    def show_result_message(self, message, tag):
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.insert(tk.END, message, tag)
+        self.result_text.config(state=tk.DISABLED)
+    
+    def _on_batch_frame_configure(self, event):
+        """Update scroll region when batch frame is resized."""
+        self.batch_canvas.configure(scrollregion=self.batch_canvas.bbox("all"))
+    
+    def _on_batch_canvas_configure(self, event):
+        """Update frame width when canvas is resized."""
+        canvas_width = event.width
+        self.batch_canvas.itemconfig(self.batch_canvas_window, width=canvas_width)
+        
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scrolling for batch results."""
+        self.batch_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def _display_batch_item(self, index):
+        """Display a specific batch item (navigation removed)."""
+        # This method is kept as a stub for compatibility
+        pass
+
+    def setup_config_panel(self, parent):
+        """Setup the validation configuration panel."""
+        # Configuration panel header
+        config_label = ttk.Label(parent, text="Validation Settings", font=("Arial", 12, "bold"))
+        config_label.pack(pady=(0, 10))
+        
+        # Preset configurations frame
+        preset_frame = ttk.LabelFrame(parent, text="Presets", padding=10)
+        preset_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(preset_frame, text="Strict (All)", command=self.apply_strict_config).pack(fill=tk.X, pady=2)
+        ttk.Button(preset_frame, text="Basic", command=self.apply_basic_config).pack(fill=tk.X, pady=2)
+        ttk.Button(preset_frame, text="Lenient", command=self.apply_lenient_config).pack(fill=tk.X, pady=2)
+    
+        # Individual validation categories
+        categories_frame = ttk.LabelFrame(parent, text="Validation Categories", padding=10)
+        categories_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Core validations (always enabled)
+        ttk.Label(categories_frame, text="Core (Always On):", font=("Arial", 9, "bold")).pack(anchor=tk.W)
+        ttk.Label(categories_frame, text="• File Handling", foreground="gray").pack(anchor=tk.W, padx=10)
+        ttk.Label(categories_frame, text="• Face Detection", foreground="gray").pack(anchor=tk.W, padx=10)
+        
+        ttk.Separator(categories_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        
+        # Configurable validations
+        ttk.Label(categories_frame, text="Configurable:", font=("Arial", 9, "bold")).pack(anchor=tk.W)
+        
+        ttk.Checkbutton(categories_frame, text="Face Sizing", variable=self.face_sizing_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Landmark Analysis", variable=self.landmark_analysis_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+    
+        ttk.Checkbutton(categories_frame, text="Eye Validation", variable=self.eye_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Obstruction Detection", variable=self.obstruction_detection_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Mouth Validation", variable=self.mouth_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Quality Assessment", variable=self.quality_assessment_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        ttk.Checkbutton(categories_frame, text="Background Validation", variable=self.background_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
+        # Current config display
+        self.config_status_label = ttk.Label(parent, text="", font=("Arial", 8), foreground="blue")
+        self.config_status_label.pack(pady=(10, 0))
+        
+        # Update initial status
+        self.update_config_status()
+    
+    def apply_strict_config(self):
+        """Apply strict validation configuration."""
+        self.face_sizing_var.set(True)
+        self.landmark_analysis_var.set(True)
+        self.eye_validation_var.set(True)
+        self.obstruction_detection_var.set(True)
+        self.mouth_validation_var.set(True)
+        self.quality_assessment_var.set(True)
+        self.background_validation_var.set(True)
+        self.update_config()
+    
+    def apply_basic_config(self):
+        """Apply basic validation configuration."""
+        self.face_sizing_var.set(True)
+        self.landmark_analysis_var.set(False)
+        self.eye_validation_var.set(True)
+        self.obstruction_detection_var.set(False)
+        self.mouth_validation_var.set(False)
+        self.quality_assessment_var.set(False)
+        self.background_validation_var.set(True)
+        self.update_config()
+    
+    def apply_lenient_config(self):
+        """Apply lenient validation configuration."""
+        self.face_sizing_var.set(False)
+        self.landmark_analysis_var.set(False)
+        self.eye_validation_var.set(False)
+        self.obstruction_detection_var.set(False)
+        self.mouth_validation_var.set(False)
+        self.quality_assessment_var.set(False)
+        self.background_validation_var.set(False)
+        self.update_config()
+    
+    def update_config(self):
+        """Update the validation configuration based on checkbox states."""
+        self.validation_config = ValidationConfig(
+            face_sizing=self.face_sizing_var.get(),
+            landmark_analysis=self.landmark_analysis_var.get(),
+            eye_validation=self.eye_validation_var.get(),
+            obstruction_detection=self.obstruction_detection_var.get(),
+            mouth_validation=self.mouth_validation_var.get(),
+            quality_assessment=self.quality_assessment_var.get(),
+            background_validation=self.background_validation_var.get()
+        )
+        self.update_config_status()
+    
+    def update_config_status(self):
+        """Update the configuration status display."""
+        enabled = self.validation_config.get_enabled_categories()
+        if len(enabled) == 7:
+            status = "Strict Mode (All)"
+        elif len(enabled) == 0:
+            status = "Lenient Mode (Core Only)"
+        else:
+            status = f"Custom ({len(enabled)}/7 enabled)"
+        
+        self.config_status_label.config(text=f"Current: {status}")
+    
     def _update_batch_results_images(self):
         """Update the batch results tab with images for each result."""
         # Clear previous results
         for widget in self.batch_scrollable_frame.winfo_children():
             widget.destroy()
         
+        # Get filtered results based on checkbox state
+        filtered_results = []
+        show_failed_only = self.show_failed_only_var.get()
+    
+        # Filter results if needed
+        if show_failed_only:
+            filtered_results = [r for r in self.batch_results if not r['passed']]
+        else:
+            filtered_results = self.batch_results
+            
+        # Update filter status in the UI
+        if show_failed_only and self.batch_results:
+            filter_status = f"Showing {len(filtered_results)} failed results out of {len(self.batch_results)} total"
+            self.progress_label.config(text=filter_status)
+        
         # Display each result with input and output images
-        for i, result in enumerate(self.batch_results):
+        for i, result in enumerate(filtered_results):
             # Create a frame for this result
             result_frame = ttk.Frame(self.batch_scrollable_frame, relief=tk.RAISED, borderwidth=1)
             result_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -582,7 +775,7 @@ class IDPhotoValidatorGUI:
             status_style = "Success.TLabel" if result['passed'] else "Failure.TLabel"
             header_frame = ttk.Frame(result_frame)
             header_frame.pack(fill=tk.X, padx=5, pady=5)
-            
+                
             ttk.Label(header_frame, text=f"{i+1}. {result['filename']}", style="SubHeader.TLabel").pack(side=tk.LEFT)
             ttk.Label(header_frame, text=status_text, style=status_style).pack(side=tk.RIGHT)
             
@@ -621,7 +814,7 @@ class IDPhotoValidatorGUI:
                 reasons_frame = ttk.Frame(result_frame)
                 reasons_frame.pack(fill=tk.X, padx=5, pady=5)
                 ttk.Label(reasons_frame, text="Failure Reasons:", style="Info.TLabel").pack(anchor=tk.W)
-                
+            
                 reasons_text = tk.Text(reasons_frame, height=3, wrap=tk.WORD, font=("Segoe UI", 9))
                 reasons_text.pack(fill=tk.X, pady=(0, 5))
                 for reason in result['reasons']:
@@ -632,5 +825,3 @@ class IDPhotoValidatorGUI:
             time_frame = ttk.Frame(result_frame)
             time_frame.pack(fill=tk.X, padx=5, pady=5)
             ttk.Label(time_frame, text=f"Processing time: {result['time']:.2f} seconds", style="Info.TLabel").pack(anchor=tk.E)
-        
-        # Navigation removed
