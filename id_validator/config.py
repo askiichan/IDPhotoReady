@@ -50,3 +50,13 @@ MIN_FACE_CONFIDENCE = 0.8
 # K-means clustering threshold for cartoon/drawing detection
 # A lower number of clusters suggests a simpler color palette, like a cartoon.
 CARTOON_THRESHOLD = 12
+
+# --- Background Validation Thresholds ---
+# Percentage of the image borders to sample for background estimation
+BG_SAMPLE_BORDER_PCT = 0.08  # 8% from each border (when used)
+# Minimum brightness (V channel in HSV, 0-255) to consider as white background
+BG_MIN_MEAN_V = 190
+# Maximum average saturation (S channel in HSV, 0-255) allowed for a white background
+BG_MAX_MEAN_S = 60
+# Maximum standard deviation on brightness to still be considered uniform background
+BG_MAX_V_STD = 60

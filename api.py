@@ -96,7 +96,8 @@ async def validate_photo(
     eye_validation: bool = Form(default=True, description="Enable eye validation"),
     obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
     mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
-    quality_assessment: bool = Form(default=True, description="Enable quality assessment")
+    quality_assessment: bool = Form(default=True, description="Enable quality assessment"),
+    background_validation: bool = Form(default=True, description="Enable background (white) validation")
 ):
     """
     Validate an ID photo for compliance with standard requirements.
@@ -150,7 +151,8 @@ async def validate_photo(
                 eye_validation=eye_validation,
                 obstruction_detection=obstruction_detection,
                 mouth_validation=mouth_validation,
-                quality_assessment=quality_assessment
+                quality_assessment=quality_assessment,
+                background_validation=background_validation
             )
         
         # Perform validation
@@ -210,7 +212,7 @@ async def validate_photo(
 
 @app.post("/validate-base64", response_model=ValidationResponse)
 async def validate_photo_base64(
-    image_data: str = Form(..., description="Base64 encoded image data"),
+    image_data: str = Form(..., description="Base64 encoded image string"),
     return_annotated: bool = Form(default=False, description="Return annotated image"),
     validation_preset: str = Form(default="strict", description="Validation preset: strict, basic, or lenient"),
     face_sizing: bool = Form(default=True, description="Enable face sizing validation"),
@@ -218,7 +220,8 @@ async def validate_photo_base64(
     eye_validation: bool = Form(default=True, description="Enable eye validation"),
     obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
     mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
-    quality_assessment: bool = Form(default=True, description="Enable quality assessment")
+    quality_assessment: bool = Form(default=True, description="Enable quality assessment"),
+    background_validation: bool = Form(default=True, description="Enable background (white) validation")
 ):
     """
     Validate an ID photo from base64 encoded image data.
@@ -270,7 +273,8 @@ async def validate_photo_base64(
                 eye_validation=eye_validation,
                 obstruction_detection=obstruction_detection,
                 mouth_validation=mouth_validation,
-                quality_assessment=quality_assessment
+                quality_assessment=quality_assessment,
+                background_validation=background_validation
             )
         
         # Perform validation

@@ -39,6 +39,7 @@ class IDPhotoValidatorGUI:
         self.obstruction_detection_var = tk.BooleanVar(value=True)
         self.mouth_validation_var = tk.BooleanVar(value=True)
         self.quality_assessment_var = tk.BooleanVar(value=True)
+        self.background_validation_var = tk.BooleanVar(value=True)
 
         self._setup_styles()
         self._create_widgets()
@@ -257,6 +258,9 @@ class IDPhotoValidatorGUI:
         ttk.Checkbutton(categories_frame, text="Quality Assessment", variable=self.quality_assessment_var, 
                        command=self.update_config).pack(anchor=tk.W, padx=10)
         
+        ttk.Checkbutton(categories_frame, text="Background Validation", variable=self.background_validation_var, 
+                       command=self.update_config).pack(anchor=tk.W, padx=10)
+        
         # Current config display
         self.config_status_label = ttk.Label(parent, text="", font=("Arial", 8), foreground="blue")
         self.config_status_label.pack(pady=(10, 0))
@@ -272,6 +276,7 @@ class IDPhotoValidatorGUI:
         self.obstruction_detection_var.set(True)
         self.mouth_validation_var.set(True)
         self.quality_assessment_var.set(True)
+        self.background_validation_var.set(True)
         self.update_config()
     
     def apply_basic_config(self):
@@ -282,6 +287,7 @@ class IDPhotoValidatorGUI:
         self.obstruction_detection_var.set(False)
         self.mouth_validation_var.set(False)
         self.quality_assessment_var.set(False)
+        self.background_validation_var.set(True)
         self.update_config()
     
     def apply_lenient_config(self):
@@ -292,6 +298,7 @@ class IDPhotoValidatorGUI:
         self.obstruction_detection_var.set(False)
         self.mouth_validation_var.set(False)
         self.quality_assessment_var.set(False)
+        self.background_validation_var.set(False)
         self.update_config()
     
     def update_config(self):
@@ -302,18 +309,19 @@ class IDPhotoValidatorGUI:
             eye_validation=self.eye_validation_var.get(),
             obstruction_detection=self.obstruction_detection_var.get(),
             mouth_validation=self.mouth_validation_var.get(),
-            quality_assessment=self.quality_assessment_var.get()
+            quality_assessment=self.quality_assessment_var.get(),
+            background_validation=self.background_validation_var.get()
         )
         self.update_config_status()
     
     def update_config_status(self):
         """Update the configuration status display."""
         enabled = self.validation_config.get_enabled_categories()
-        if len(enabled) == 6:
+        if len(enabled) == 7:
             status = "Strict Mode (All)"
         elif len(enabled) == 0:
             status = "Lenient Mode (Core Only)"
         else:
-            status = f"Custom ({len(enabled)}/6 enabled)"
+            status = f"Custom ({len(enabled)}/7 enabled)"
         
         self.config_status_label.config(text=f"Current: {status}")

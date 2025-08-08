@@ -20,6 +20,7 @@ class ValidationConfig:
     obstruction_detection: bool = True
     mouth_validation: bool = True
     quality_assessment: bool = True
+    background_validation: bool = True
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -29,7 +30,8 @@ class ValidationConfig:
             'eye_validation': self.eye_validation,
             'obstruction_detection': self.obstruction_detection,
             'mouth_validation': self.mouth_validation,
-            'quality_assessment': self.quality_assessment
+            'quality_assessment': self.quality_assessment,
+            'background_validation': self.background_validation
         }
     
     @classmethod
@@ -41,7 +43,8 @@ class ValidationConfig:
             eye_validation=config_dict.get('eye_validation', True),
             obstruction_detection=config_dict.get('obstruction_detection', True),
             mouth_validation=config_dict.get('mouth_validation', True),
-            quality_assessment=config_dict.get('quality_assessment', True)
+            quality_assessment=config_dict.get('quality_assessment', True),
+            background_validation=config_dict.get('background_validation', True)
         )
     
     def get_enabled_categories(self) -> list:
@@ -59,6 +62,8 @@ class ValidationConfig:
             enabled.append("Mouth Validation")
         if self.quality_assessment:
             enabled.append("Quality Assessment")
+        if self.background_validation:
+            enabled.append("Background Validation")
         return enabled
 
 # Default configuration
@@ -71,7 +76,8 @@ STRICT_CONFIG = ValidationConfig(
     eye_validation=True,
     obstruction_detection=True,
     mouth_validation=True,
-    quality_assessment=True
+    quality_assessment=True,
+    background_validation=True
 )
 
 BASIC_CONFIG = ValidationConfig(
@@ -80,7 +86,8 @@ BASIC_CONFIG = ValidationConfig(
     eye_validation=True,
     obstruction_detection=False,
     mouth_validation=False,
-    quality_assessment=False
+    quality_assessment=False,
+    background_validation=True
 )
 
 LENIENT_CONFIG = ValidationConfig(
@@ -89,5 +96,6 @@ LENIENT_CONFIG = ValidationConfig(
     eye_validation=False,
     obstruction_detection=False,
     mouth_validation=False,
-    quality_assessment=False
+    quality_assessment=False,
+    background_validation=False
 )

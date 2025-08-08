@@ -13,6 +13,7 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 - **Size Validation**: Ensures face occupies appropriate portion of image (5-80%)
 - **Obstruction Detection**: Identifies hands, objects, or other obstructions covering the face
 - **Mouth Validation**: Checks for proper mouth visibility and positioning
+- **Background Validation**: Verifies that the photo background is mostly white and uniform using HSV analysis on a ring around the detected face (annotates sampled region)
 
 ### Configurable Validation Categories
 
@@ -22,6 +23,7 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 - **Obstruction Detection**: Skin color analysis to detect face coverings
 - **Mouth Validation**: Mouth visibility and positioning checks
 - **Quality Assessment**: Cartoon/drawing detection and image quality analysis
+- **Background Validation**: White/neutral, uniform background check (toggleable)
 
 ### User Interfaces
 
@@ -46,7 +48,7 @@ The GUI provides:
 - **Validation Configuration**: Choose from preset modes or customize individual validation categories:
   - **Strict Mode**: All validation categories enabled (default)
   - **Basic Mode**: Essential validations only (face sizing, eye validation)
-  - **Lenient Mode**: Core validations only (file handling, face detection)
+  - **Lenient Mode**: Core validations only (file handling, face detection) — background check off
   - **Custom Mode**: Individual control over each validation category
 - **Real-time Results**: Instant validation feedback with detailed reasons
 - **Annotated Images**: Visual display with facial landmarks and validation overlays
@@ -120,7 +122,7 @@ with open('photo.jpg', 'rb') as f:
         files={'file': f},
         data={
             'return_annotated': True,
-            'validation_preset': 'strict'
+            'validation_preset': 'strict'  # background_validation defaults to true in presets
         }
     )
 
@@ -137,6 +139,7 @@ with open('photo.jpg', 'rb') as f:
             'obstruction_detection': False,
             'mouth_validation': False,
             'quality_assessment': True,
+            'background_validation': True,  # toggle background check
             'return_annotated': True
         }
     )
@@ -182,6 +185,13 @@ The system validates photos against configurable criteria organized into categor
 
 - Mouth area must be clearly visible
 - Proper mouth positioning checks
+
+#### Background Validation
+
+- Background should be mostly white/neutral and reasonably uniform
+- Robust sampling: evaluates a ring-shaped region around the detected face (avoids clothing/edges)
+- HSV-based decision with configurable thresholds; visually annotates sampled region when `return_annotated=True`
+- Toggle via GUI checkbox or API param `background_validation` (default enabled; disabled in lenient preset)
 
 #### Quality Assessment
 
@@ -235,6 +245,26 @@ protrait-validation-OpenCVYOLO/
 - `ValidationConfig` class for flexible validation control
 - Preset configurations: `STRICT_CONFIG`, `BASIC_CONFIG`, `LENIENT_CONFIG`
 - Runtime configuration through GUI checkboxes or API parameters
+
+#### Background Validation thresholds
+
+The following constants in `id_validator/config.py` control background analysis:
+
+- `BG_SAMPLE_BORDER_PCT` — size of the ring sampled around the detected face (default: 0.08 ≈ 8% of min(image dimension)).
+- `BG_MIN_MEAN_V` — minimum acceptable brightness (V channel) for a white-ish background (default: 190).
+- `BG_MAX_MEAN_S` — maximum acceptable saturation (S channel) (default: 60).
+- `BG_MAX_V_STD` — target maximum brightness standard deviation for uniformity (used for diagnostics; background logic is now robust to small dark areas) (default: 60).
+
+Decision rule (implemented in `id_validator/validator.py`):
+
+- Pass if the ring's white-ish coverage is high (≥ 60%)
+  OR if overall V is high (≥ 190) and S is low (≤ 70).
+
+Tips for tuning:
+
+- If clean white backgrounds are failing: lower `BG_MIN_MEAN_V` (e.g., 185) or increase `BG_MAX_MEAN_S` (e.g., 70).
+- If colored backgrounds are slipping through: raise `BG_MIN_MEAN_V` or lower `BG_MAX_MEAN_S` back toward stricter values.
+- Increase `BG_SAMPLE_BORDER_PCT` slightly (e.g., 0.10) if the sampled ring is too close to hair/shoulders; decrease if images are tightly cropped.
 
 ### Dependencies
 

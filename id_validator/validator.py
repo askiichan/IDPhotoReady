@@ -14,7 +14,8 @@ from .config import (
     CARTOON_THRESHOLD, EAR_THRESHOLD,
     MIN_SKIN_PERCENTAGE, MAX_UNIFORM_BLOCK_RATIO, UNIFORM_COLOR_STD_THRESHOLD,
     MIN_EDGE_DENSITY, MIN_COLOR_VARIANCE, MAX_DARK_PIXEL_RATIO, MAX_BRIGHT_PIXEL_RATIO,
-    DARK_PIXEL_THRESHOLD, BRIGHT_PIXEL_THRESHOLD
+    DARK_PIXEL_THRESHOLD, BRIGHT_PIXEL_THRESHOLD,
+    BG_SAMPLE_BORDER_PCT, BG_MIN_MEAN_V, BG_MAX_MEAN_S, BG_MAX_V_STD
 )
 from .validation_config import ValidationConfig, DEFAULT_CONFIG
 
@@ -99,6 +100,77 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
     # Face Sizing Validation (configurable)
     if config.face_sizing and not (MIN_FACE_SIZE_RATIO <= face_ratio <= MAX_FACE_SIZE_RATIO):
         reasons.append(f"Face size is {face_ratio:.1%}, outside the acceptable range of {MIN_FACE_SIZE_RATIO:.0%}-{MAX_FACE_SIZE_RATIO:.0%}.")
+
+    # Background Validation (ring around the face), after detection
+    if getattr(config, 'background_validation', True):
+        try:
+            hsv_full = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            # Define a ring region around the face by padding the bbox
+            pad = int(max(face_w, face_h) * 0.25)  # 25% of max face dimension
+            x1 = max(0, startX - pad)
+            y1 = max(0, startY - pad)
+            x2 = min(w, endX + pad)
+            y2 = min(h, endY + pad)
+
+            # Create mask that includes the padded box but excludes the face bbox itself
+            roi_h = y2 - y1
+            roi_w = x2 - x1
+            if roi_h > 0 and roi_w > 0:
+                ring_mask = np.ones((roi_h, roi_w), dtype=np.uint8)
+                # Exclude inner box slightly larger than face to avoid hair edges
+                inner_margin = int(0.05 * max(face_w, face_h))
+                ix1 = max(0, startX - x1 - inner_margin)
+                iy1 = max(0, startY - y1 - inner_margin)
+                ix2 = min(roi_w, endX - x1 + inner_margin)
+                iy2 = min(roi_h, endY - y1 + inner_margin)
+                ring_mask[iy1:iy2, ix1:ix2] = 0
+
+                roi_hsv = hsv_full[y1:y2, x1:x2]
+                ring_pixels = roi_hsv[ring_mask.astype(bool)].reshape(-1, 3)
+
+                # If ring is too small (e.g., close crop), fallback to image borders
+                if ring_pixels.shape[0] < 1000:
+                    bp = BG_SAMPLE_BORDER_PCT
+                    top_h = max(1, int(h * bp))
+                    bot_y = h - top_h
+                    left_w = max(1, int(w * bp))
+                    right_x = w - left_w
+                    top = hsv_full[0:top_h, :]
+                    bottom = hsv_full[bot_y:h, :]
+                    left = hsv_full[:, 0:left_w]
+                    right = hsv_full[:, right_x:w]
+                    ring_pixels = np.concatenate([
+                        top.reshape(-1, 3),
+                        bottom.reshape(-1, 3),
+                        left.reshape(-1, 3),
+                        right.reshape(-1, 3)
+                    ], axis=0)
+
+                mean_hsv = np.mean(ring_pixels, axis=0)
+                std_hsv = np.std(ring_pixels, axis=0)
+                mean_s = mean_hsv[1]
+                mean_v = mean_hsv[2]
+                std_v = std_hsv[2]
+                s_mask = ring_pixels[:, 1] <= BG_MAX_MEAN_S
+                v_mask = ring_pixels[:, 2] >= BG_MIN_MEAN_V
+                white_mask = (s_mask & v_mask)
+                white_count = int(np.sum(white_mask))
+                whiteish_ratio = float(white_count) / float(ring_pixels.shape[0])
+
+                # Simplified, robust decision:
+                # Pass if either a) enough white-ish coverage, or b) high V and low S overall.
+                passes_bg = (whiteish_ratio >= 0.60) or (mean_v >= max(185, BG_MIN_MEAN_V) and mean_s <= min(70, BG_MAX_MEAN_S + 10))
+
+                if not passes_bg:
+                    msg = f"Background not sufficiently white/uniform (S̄={mean_s:.1f}, V̄={mean_v:.1f}, σV={std_v:.1f}, white%={whiteish_ratio*100:.0f}%)."
+                    reasons.append(msg)
+
+                if annotated_image is not None:
+                    # Draw ring region and inner exclusion on annotated image
+                    cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (255, 255, 0), 2)
+                    cv2.rectangle(annotated_image, (startX - inner_margin, startY - inner_margin), (endX + inner_margin, endY + inner_margin), (255, 255, 0), 1)
+        except Exception as e:
+            reasons.append(f"Background validation error: {str(e)}")
 
     # 3. Quality Assessment and Obstruction Detection (configurable)
     face_roi = image[startY:endY, startX:endX]
