@@ -62,7 +62,7 @@ The GUI provides:
 
 ```bash
 # Clone or download the project
-cd protrait-validation-OpenCVYOLO
+cd id-photo-validator
 
 # Create virtual environment
 python -m venv venv
