@@ -66,13 +66,13 @@ class IDPhotoValidatorGUI:
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Left panel for configuration
-        config_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
-        main_paned.add(config_panel, weight=0)
-        
-        # Middle panel for input image
+        # Left panel for input image
         left_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
         main_paned.add(left_panel, weight=1)
+        
+        # Middle panel for configuration
+        config_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
+        main_paned.add(config_panel, weight=0)
         
         # Right panel for results
         right_panel = ttk.Frame(main_paned, relief=tk.RAISED, borderwidth=2)
@@ -369,54 +369,17 @@ class IDPhotoValidatorGUI:
             self.result_text.insert(tk.END, f"  Processing time: {result['time']:.2f} seconds\n\n", "time")
         
         self.result_text.config(state=tk.DISABLED)
-        
-        # Update batch results tab with images
-        self._update_batch_results_images()
-        
-    def display_image(self, label, image_source, is_cv2_img=False):
-        """Display an image in a label with proper sizing and aspect ratio."""
-        try:
-            if is_cv2_img:
-                # Ensure the array is uint8, which is required by Pillow
-                rgb_img = cv2.cvtColor(image_source, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(rgb_img.astype('uint8'))
-            else:
-                img = Image.open(image_source)
-            
-            # Get the original image dimensions
-            orig_width, orig_height = img.size
-            
-            # Set a reasonable max size while maintaining aspect ratio
-            max_width, max_height = 400, 300
-            
-            # Calculate the scaling factor to fit within the max dimensions
-            width_ratio = max_width / orig_width if orig_width > max_width else 1
-            height_ratio = max_height / orig_height if orig_height > max_height else 1
-            
-            # Use the smaller ratio to ensure the image fits in both dimensions
-            scale_factor = min(width_ratio, height_ratio)
-            
-            # Calculate new dimensions
-            new_width = int(orig_width * scale_factor)
-            new_height = int(orig_height * scale_factor)
-            
-            # Resize the image with proper aspect ratio
-            resized_img = img.resize((new_width, new_height), Image.LANCZOS)
-            
-            photo = ImageTk.PhotoImage(resized_img)
-            
-            label.configure(image=photo)
-            label.image = photo  # Keep a reference to prevent garbage collection
-        except Exception as e:
-            error_message = f"Error displaying image:\n{e}"
-            label.configure(text=error_message, image='')
-            label.image = None
-            
-    def display_results(self, is_valid, reasons, duration):
-        """Display validation results in the result text area."""
-        self.result_text.config(state=tk.NORMAL)
-        self.result_text.delete(1.0, tk.END)
-        
+
+def _reset_progress(self):
+    """Reset progress bar and label after processing."""
+    self.progress_bar['value'] = 0
+    self.progress_label.config(text="")
+
+def display_batch_results(self, results, total_files, passed_count, failed_count):
+    """Display results for batch processing."""
+    # Store results for navigation
+    self.batch_results = results
+    self.current_batch_index = 0
         if is_valid:
             self.result_text.insert(tk.END, "Validation Passed!\n", "success")
             self.result_text.insert(tk.END, "The photo meets all requirements.", "reason")
