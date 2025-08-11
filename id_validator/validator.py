@@ -307,7 +307,7 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
     # Always draw the face rectangle if we have an annotated image
     if annotated_image is not None:
         cv2.rectangle(annotated_image, (startX, startY), (endX, endY), (0, 255, 255), 2)  # Cyan rectangle
-        cv2.putText(annotated_image, "Face Detected", (startX, startY-10), 
+        cv2.putText(annotated_image, "Face", (startX, startY-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
     # 4. Facial Landmark Detection (Now Required for ID Photos)
