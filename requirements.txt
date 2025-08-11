@@ -9,3 +9,4 @@ uvicorn[standard]
 python-multipart
 pydantic>=1.8.2
 gradio>=3.0.0
+mediapipe>=0.10.0

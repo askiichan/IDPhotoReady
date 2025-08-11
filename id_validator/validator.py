@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from sklearn.cluster import KMeans
 from typing import Tuple, List, Optional, Dict, Any
+import mediapipe as mp
 
 from .config import (
     FACE_PROTO, FACE_MODEL, LANDMARK_MODEL,
@@ -24,9 +25,20 @@ try:
     face_net = cv2.dnn.readNetFromCaffe(FACE_PROTO, FACE_MODEL)
     landmark_facemark = cv2.face.createFacemarkLBF()
     landmark_facemark.loadModel(LANDMARK_MODEL)
+    
+    # Initialize MediaPipe Hands
+    mp_hands = mp.solutions.hands
+    hands_detector = mp_hands.Hands(
+        static_image_mode=True,
+        max_num_hands=2,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+    
     models_loaded = True
-except cv2.error as e:
+except (cv2.error, ImportError) as e:
     models_loaded = False
+    hands_detector = None
     print(f"Error loading models: {e}. Please run the main script to download them.")
 
 # --- Landmark Drawing Utility (lines instead of individual dots) ---
@@ -397,23 +409,81 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
                 if mouth_width < 20 or mouth_height < 8:
                     reasons.append("Mouth region is not clearly visible or may be obstructed.")
             
-            # Advanced Obstruction Detection (configurable)
-            if config.obstruction_detection:
-                # Check for abnormal landmark clustering (hands/objects covering face)
-                landmark_std_x = np.std(landmark_points[:, 0])
-                landmark_std_y = np.std(landmark_points[:, 1])
+            # MediaPipe Hands Detection for Obstruction (configurable)
+            if config.obstruction_detection and hands_detector is not None:
+                # Convert BGR to RGB for MediaPipe
+                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 
-                # If landmarks are too clustered, it might indicate incorrect detection
-                expected_face_width = face_w * 0.6  # Expected landmark spread
-                if landmark_std_x < expected_face_width * 0.15:
-                    reasons.append("Facial landmarks appear abnormally clustered. Face may be obstructed by hands or objects.")
+                # Detect hands in the image
+                hand_results = hands_detector.process(rgb_image)
                 
-                # Check nose bridge continuity
-                nose_bridge = landmark_points[27:31]
-                if len(nose_bridge) >= 4:
-                    nose_bridge_length = np.linalg.norm(nose_bridge[-1] - nose_bridge[0])
-                    if nose_bridge_length < 15:
-                        reasons.append("Nose bridge landmarks are too close together. Face may be obstructed.")
+                if hand_results.multi_hand_landmarks:
+                    # Check if any detected hands overlap with the face region
+                    face_center_x = startX + face_w // 2
+                    face_center_y = startY + face_h // 2
+                    face_radius = min(face_w, face_h) // 2
+                    
+                    hands_detected_near_face = False
+                    
+                    for hand_landmarks in hand_results.multi_hand_landmarks:
+                        # Check if hand landmarks are within or close to the face region
+                        hand_in_face_region = False
+                        
+                        for landmark in hand_landmarks.landmark:
+                            # Convert normalized coordinates to pixel coordinates
+                            hand_x = int(landmark.x * w)
+                            hand_y = int(landmark.y * h)
+                            
+                            # Check if hand landmark is within the face region
+                            distance_to_face_center = np.sqrt((hand_x - face_center_x)**2 + (hand_y - face_center_y)**2)
+                            
+                            # If hand is within 1.2x the face radius, it's potentially obstructing
+                            if distance_to_face_center < face_radius * 1.2:
+                                hand_in_face_region = True
+                                break
+                        
+                        if hand_in_face_region:
+                            hands_detected_near_face = True
+                        
+                        # Draw hand landmarks on annotated image if available
+                        if annotated_image is not None:
+                            # Draw hand landmarks as connected lines
+                            hand_color = (0, 0, 255) if hand_in_face_region else (255, 0, 0)  # Red if obstructing, blue if not
+                            
+                            # Convert landmarks to pixel coordinates
+                            hand_points = []
+                            for landmark in hand_landmarks.landmark:
+                                hand_x = int(landmark.x * w)
+                                hand_y = int(landmark.y * h)
+                                hand_points.append([hand_x, hand_y])
+                                
+                                # Draw landmark points
+                                cv2.circle(annotated_image, (hand_x, hand_y), 3, hand_color, -1)
+                            
+                            # Draw hand connections (simplified hand skeleton)
+                            hand_connections = [
+                                # Thumb
+                                (0, 1), (1, 2), (2, 3), (3, 4),
+                                # Index finger
+                                (0, 5), (5, 6), (6, 7), (7, 8),
+                                # Middle finger
+                                (0, 9), (9, 10), (10, 11), (11, 12),
+                                # Ring finger
+                                (0, 13), (13, 14), (14, 15), (15, 16),
+                                # Pinky
+                                (0, 17), (17, 18), (18, 19), (19, 20),
+                                # Palm connections
+                                (5, 9), (9, 13), (13, 17)
+                            ]
+                            
+                            for connection in hand_connections:
+                                if connection[0] < len(hand_points) and connection[1] < len(hand_points):
+                                    pt1 = tuple(hand_points[connection[0]])
+                                    pt2 = tuple(hand_points[connection[1]])
+                                    cv2.line(annotated_image, pt1, pt2, hand_color, 2)
+                    
+                    if hands_detected_near_face:
+                        reasons.append("Hand detected near or covering the face area. Please remove hands from the face region.")
         
         # Draw landmarks only if detection succeeds
         if annotated_image is not None:
