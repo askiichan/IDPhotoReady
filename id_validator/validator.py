@@ -29,6 +29,40 @@ except cv2.error as e:
     models_loaded = False
     print(f"Error loading models: {e}. Please run the main script to download them.")
 
+# --- Landmark Drawing Utility (lines instead of individual dots) ---
+def draw_landmarks_lines(image: np.ndarray, landmark_points: np.ndarray, color=(0, 255, 255), thickness: int = 1):
+    """Draw facial landmarks as connected line segments (contours) instead of dots.
+
+    Assumes 68-point landmark layout (LBF/dlib style). Gracefully returns if shape differs.
+    """
+    if landmark_points is None:
+        return
+    pts = landmark_points
+    if len(pts.shape) == 3:  # sometimes (1,68,2)
+        pts = pts.reshape(-1, 2)
+    if pts.shape[0] < 60:  # not standard 68-landmark set, fallback to simple polyline
+        cv2.polylines(image, [pts.astype(int)], False, color, thickness, cv2.LINE_AA)
+        return
+
+    def poly(start, end, closed=False):
+        seg = pts[start:end].astype(int)
+        cv2.polylines(image, [seg], closed, color, thickness, cv2.LINE_AA)
+
+    # Jaw line (open)
+    poly(0, 17, False)
+    # Right eyebrow 17-21, Left eyebrow 22-26
+    poly(17, 22, False)
+    poly(22, 27, False)
+    # Nose bridge 27-30 (open) & lower nose 31-35 (closed)
+    poly(27, 31, False)
+    poly(31, 36, True)
+    # Right eye 36-41, Left eye 42-47 (closed)
+    poly(36, 42, True)
+    poly(42, 48, True)
+    # Outer lip 48-60 (closed) & inner lip 60-68 (closed)
+    poly(48, 60, True)
+    poly(60, 68, True)
+
 def validate_id_photo(image_path: str, return_annotated: bool = False, config: ValidationConfig = None) -> Tuple[bool, List[str], Optional[np.ndarray]]:
     """
     Validates a student ID photo based on configurable validation rules.
@@ -383,18 +417,22 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
         
         # Draw landmarks only if detection succeeds
         if annotated_image is not None:
-            cv2.face.drawFacemarks(annotated_image, landmarks[0], (0, 255, 255))  # Cyan landmarks
+            # Draw lines connecting landmark regions instead of single dots
+            try:
+                draw_landmarks_lines(annotated_image, landmark_points, color=(0, 255, 255), thickness=1)
+            except Exception:
+                pass  # Fail silently if drawing fails
             
-            # Add validation status overlay
-            if len(reasons) > 0:
-                cv2.putText(annotated_image, "VALIDATION FAILED", (startX, endY+40), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)  # Red warning
-                # Add number of issues
-                cv2.putText(annotated_image, f"{len(reasons)} issues detected", (startX, endY+65), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            else:
-                cv2.putText(annotated_image, "VALIDATION PASSED", (startX, endY+40), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)  # Green success
+            # # Add validation status overlay
+            # if len(reasons) > 0:
+            #     cv2.putText(annotated_image, "VALIDATION FAILED", (startX, endY+40), 
+            #                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)  # Red warning
+            #     # Add number of issues
+            #     cv2.putText(annotated_image, f"{len(reasons)} issues detected", (startX, endY+65), 
+            #                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            # else:
+            #     cv2.putText(annotated_image, "VALIDATION PASSED", (startX, endY+40), 
+            #                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)  # Green success
 
     is_valid = len(reasons) == 0
     return is_valid, reasons, annotated_image

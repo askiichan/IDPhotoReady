@@ -9,7 +9,7 @@ import threading
 from typing import List, Tuple, Optional
 import numpy as np
 import gradio as gr
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import requests
 
 from .config import (
@@ -257,8 +257,8 @@ class IDPhotoValidatorGradio:
                                 label="Configuration Preset"
                             )
                             
-                            # Custom configuration
-                            with gr.Group(visible=False) as custom_config:
+                            # Configuration list (always visible now)
+                            with gr.Group() as custom_config:  # kept variable name for minimal downstream changes
                                 gr.Markdown("### Custom Configuration")
                                 face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
                                 landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
@@ -267,15 +267,37 @@ class IDPhotoValidatorGradio:
                                 mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
                                 quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
                                 background_validation_cb = gr.Checkbox(label="Background Validation", value=True)
-                            
-                            # Update visibility of custom config based on preset
-                            def update_config_visibility(preset):
-                                return gr.Group(visible=(preset == "Custom"))
-                            
+
+                            # Update checkbox states when a preset (non-Custom) is chosen so user can see values
+                            def update_config_values(preset):
+                                cfg = self._update_config_from_presets(preset)
+                                if not cfg:  # Custom => don't override manual selections
+                                    return [
+                                        gr.update(), gr.update(), gr.update(),
+                                        gr.update(), gr.update(), gr.update(), gr.update()
+                                    ]
+                                return [
+                                    gr.update(value=cfg["face_sizing"]),
+                                    gr.update(value=cfg["landmark_analysis"]),
+                                    gr.update(value=cfg["eye_validation"]),
+                                    gr.update(value=cfg["obstruction_detection"]),
+                                    gr.update(value=cfg["mouth_validation"]),
+                                    gr.update(value=cfg["quality_assessment"]),
+                                    gr.update(value=cfg["background_validation"])
+                                ]
+
                             preset_radio.change(
-                                update_config_visibility,
+                                update_config_values,
                                 inputs=[preset_radio],
-                                outputs=[custom_config]
+                                outputs=[
+                                    face_sizing_cb,
+                                    landmark_analysis_cb,
+                                    eye_validation_cb,
+                                    obstruction_detection_cb,
+                                    mouth_validation_cb,
+                                    quality_assessment_cb,
+                                    background_validation_cb
+                                ]
                             )
                             
                         with gr.Column():
@@ -340,8 +362,8 @@ class IDPhotoValidatorGradio:
                                 label="Configuration Preset"
                             )
                             
-                            # Custom configuration
-                            with gr.Group(visible=False) as batch_custom_config:
+                            # Configuration list (always visible now for batch)
+                            with gr.Group() as batch_custom_config:  # keep variable name
                                 gr.Markdown("### Custom Configuration")
                                 batch_face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
                                 batch_landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
@@ -350,12 +372,20 @@ class IDPhotoValidatorGradio:
                                 batch_mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
                                 batch_quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
                                 batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=True)
-                            
-                            # Update visibility of custom config based on preset
+
+                            # Batch preset change should also reflect values in checkboxes
                             batch_preset_radio.change(
-                                update_config_visibility,
+                                update_config_values,
                                 inputs=[batch_preset_radio],
-                                outputs=[batch_custom_config]
+                                outputs=[
+                                    batch_face_sizing_cb,
+                                    batch_landmark_analysis_cb,
+                                    batch_eye_validation_cb,
+                                    batch_obstruction_detection_cb,
+                                    batch_mouth_validation_cb,
+                                    batch_quality_assessment_cb,
+                                    batch_background_validation_cb
+                                ]
                             )
                             
                             process_btn = gr.Button("Process Folder", variant="primary")
@@ -363,50 +393,146 @@ class IDPhotoValidatorGradio:
                             
                         with gr.Column():
                             gallery_output = gr.Gallery(label="Batch Results", columns=3, object_fit="contain", height="auto")
+                            results_table = gr.Dataframe(
+                                headers=["File", "Status", "Reasons", "Time (s)"],
+                                datatype=["str", "str", "str", "number"],
+                                row_count=(0, "dynamic"),
+                                col_count=(4, "fixed"),
+                                interactive=False,
+                                label="Detailed Results"
+                            )
                     
-                    # Wrapper function to format results for gallery
-                    def format_batch_results(*args):
-                        summary, results = self.process_batch(*args)
-                        
-                        # Format results for gallery: (image, caption) tuples
-                        gallery_items = []
-                        for file_path, status, reason_text, processing_time, annotated_img in results:
-                            if annotated_img is not None:
-                                # Convert numpy array to PIL Image for Gradio
-                                # Gradio expects RGB format
-                                if len(annotated_img.shape) == 3 and annotated_img.shape[2] == 3:
-                                    # Convert BGR to RGB
-                                    rgb_img = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-                                else:
-                                    rgb_img = annotated_img
-                                pil_img = Image.fromarray(rgb_img)
-                                caption = f"{os.path.basename(file_path)} - {status} ({processing_time:.2f}s)"
-                                gallery_items.append((pil_img, caption))
+                    # Streaming batch processor to show progress and detailed results
+                    def stream_batch_results(folder_path, preset,
+                                              face_sizing, landmark_analysis, eye_validation,
+                                              obstruction_detection, mouth_validation,
+                                              quality_assessment, background_validation):
+                        if self.models_downloading:
+                            yield "Please wait for models to finish downloading.", [], []
+                            return
+                        if not folder_path:
+                            yield "Please select a folder.", [], []
+                            return
+
+                        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp')
+                        image_files = [f for f in os.listdir(folder_path)
+                                       if f.lower().endswith(image_extensions) and
+                                       os.path.isfile(os.path.join(folder_path, f))]
+                        if not image_files:
+                            yield "No image files found in the selected folder.", [], []
+                            return
+
+                        # Config
+                        if preset != "Custom":
+                            config_dict = self._update_config_from_presets(preset)
+                            if config_dict:
+                                config = ValidationConfig(**config_dict)
                             else:
-                                # If no annotated image, use the original image
+                                config = self.validation_config
+                        else:
+                            config = self._create_validation_config(
+                                face_sizing, landmark_analysis, eye_validation,
+                                obstruction_detection, mouth_validation,
+                                quality_assessment, background_validation
+                            )
+                        self.validation_config = config
+
+                        total = len(image_files)
+                        gallery_items = []
+                        table_rows = []
+                        passed = 0
+                        failed = 0
+
+                        # Initial yield
+                        yield f"Starting batch: {total} files", gallery_items, table_rows
+
+                        prog = gr.Progress(track_tqdm=False)
+                        for idx, filename in enumerate(image_files):
+                            prog((idx + 1) / total, desc=f"Processing {filename}")
+                            file_path = os.path.join(folder_path, filename)
+                            try:
+                                start = time.time()
+                                is_valid, reasons, annotated_img = validate_id_photo(file_path, return_annotated=True, config=config)
+                                proc_time = time.time() - start
+                                status = "PASSED" if is_valid else "FAILED"
+                                if is_valid:
+                                    passed += 1
+                                else:
+                                    failed += 1
+                                reason_text = "; ".join(reasons) if reasons else ""
+                            except Exception as e:
+                                status = "ERROR"
+                                reason_text = f"Error: {str(e)}"
+                                proc_time = 0
+                                annotated_img = None
+                                failed += 1
+
+                            # Prepare image for gallery
+                            display_img = None
+                            if annotated_img is not None:
+                                if len(annotated_img.shape) == 3 and annotated_img.shape[2] == 3:
+                                    display_img = Image.fromarray(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB))
+                                else:
+                                    display_img = Image.fromarray(annotated_img)
+                            else:
                                 try:
                                     original_img = cv2.imread(file_path)
                                     if original_img is not None:
                                         if len(original_img.shape) == 3 and original_img.shape[2] == 3:
-                                            rgb_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB)
-                                        else:
-                                            rgb_img = original_img
-                                        pil_img = Image.fromarray(rgb_img)
-                                        caption = f"{os.path.basename(file_path)} - {status} ({processing_time:.2f}s)"
-                                        gallery_items.append((pil_img, caption))
+                                            original_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB)
+                                        display_img = Image.fromarray(original_img)
                                 except Exception:
-                                    # If we can't load the image, just add a text placeholder
                                     placeholder = np.zeros((100, 100, 3), dtype=np.uint8)
-                                    placeholder[:, :, 2] = 255  # Red placeholder
-                                    pil_img = Image.fromarray(placeholder)
-                                    caption = f"{os.path.basename(file_path)} - {status} ({processing_time:.2f}s)"
-                                    gallery_items.append((pil_img, caption))
-                        
-                        return summary, gallery_items
-                    
-                    # Process function
+                                    placeholder[:, :, 2] = 255
+                                    display_img = Image.fromarray(placeholder)
+
+                            # Overlay status badge (top-right corner)
+                            if display_img is not None:
+                                try:
+                                    img_with_badge = display_img.copy()
+                                    draw = ImageDraw.Draw(img_with_badge)
+                                    font = ImageFont.load_default()
+                                    badge_text = "OK" if status == "PASSED" else ("ERR" if status == "ERROR" else "FAIL")
+                                    # Colors
+                                    if status == "PASSED":
+                                        bg_color = (34, 139, 34, 230)  # green
+                                    elif status == "FAILED":
+                                        bg_color = (220, 20, 60, 230)  # crimson
+                                    else:
+                                        bg_color = (255, 140, 0, 230)  # dark orange
+                                    text_color = (255, 255, 255, 255)
+                                    # Measure text
+                                    text_w, text_h = draw.textbbox((0,0), badge_text, font=font)[2:]
+                                    pad = 4
+                                    badge_w = text_w + pad * 2
+                                    badge_h = text_h + pad * 2
+                                    W, H = img_with_badge.size
+                                    # Rectangle coordinates (top-right)
+                                    rect_xy = [W - badge_w - 5, 5, W - 5, 5 + badge_h]
+                                    # Draw rectangle
+                                    draw.rectangle(rect_xy, fill=bg_color)
+                                    # Draw text centered
+                                    text_x = rect_xy[0] + pad
+                                    text_y = rect_xy[1] + pad - 1
+                                    draw.text((text_x, text_y), badge_text, font=font, fill=text_color)
+                                    display_img = img_with_badge
+                                except Exception:
+                                    pass
+
+                            short_reason = reason_text.split(';')[0][:60] + ('...' if reason_text and len(reason_text.split(';')[0]) > 60 else '')
+                            caption = f"{filename}\n{status} ({proc_time:.2f}s)" + (f"\n{short_reason}" if short_reason else "")
+                            gallery_items.append((display_img, caption))
+                            table_rows.append([filename, status, reason_text, round(proc_time, 2)])
+
+                            summary = f"Processing {idx + 1}/{total} | Passed: {passed} Failed: {failed}"
+                            yield summary, gallery_items, table_rows
+
+                        final_summary = f"Processed {total} files: {passed} passed, {failed} failed"
+                        yield final_summary, gallery_items, table_rows
+
+                    # Hook streaming processor
                     process_btn.click(
-                        format_batch_results,
+                        stream_batch_results,
                         inputs=[
                             folder_input,
                             batch_preset_radio,
@@ -418,7 +544,7 @@ class IDPhotoValidatorGradio:
                             batch_quality_assessment_cb,
                             batch_background_validation_cb
                         ],
-                        outputs=[progress_output, gallery_output]
+                        outputs=[progress_output, gallery_output, results_table]
                     )
             
             # Footer
