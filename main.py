@@ -2,15 +2,9 @@
 Main entry point for the ID Photo Validator application.
 """
 
-import tkinter as tk
-from id_validator.gui import IDPhotoValidatorGUI
+from id_validator.gradio_gui import IDPhotoValidatorGradio
 
 if __name__ == "__main__":
-    # Create the main application window
-    root = tk.Tk()
-    
-    # Instantiate the GUI class
-    app = IDPhotoValidatorGUI(root)
-    
-    # Start the Tkinter event loop
-    root.mainloop()
+    # Create and launch the Gradio interface
+    validator = IDPhotoValidatorGradio()
+    validator.launch()

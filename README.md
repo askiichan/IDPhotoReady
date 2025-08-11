@@ -27,7 +27,7 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 
 ### User Interfaces
 
-- **Professional GUI**: User-friendly interface with configurable validation settings
+- **Professional GUI**: User-friendly web interface with configurable validation settings and batch processing
 - **REST API**: FastAPI-based web service with configurable validation presets
 - **Annotated Results**: Visual feedback showing detected landmarks and validation issues
 - **Preset Configurations**: Strict, Basic, and Lenient validation modes
@@ -36,7 +36,7 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 
 ### GUI Application
 
-Run the desktop application:
+Run the web-based application:
 
 ```bash
 python main.py
@@ -52,9 +52,13 @@ The GUI provides:
   - **Custom Mode**: Individual control over each validation category
 - **Real-time Results**: Instant validation feedback with detailed reasons
 - **Annotated Images**: Visual display with facial landmarks and validation overlays
+- **Batch Processing**: Process entire folders of images with progress tracking
 - **Processing Time**: Performance metrics for each validation
 
 **Supported formats**: JPG, PNG, BMP, TIFF
+
+After running the command, the application will start a local web server.
+Open your browser and navigate to the URL displayed in the terminal (typically http://localhost:7860) to access the interface.
 
 ## Installation
 
@@ -80,7 +84,7 @@ pip install -r requirements.txt
 - OpenCV with contrib modules
 - scikit-learn
 - Pillow (PIL)
-- tkinter (usually included with Python)
+- Gradio (for GUI)
 - NumPy (dependency of OpenCV)
 - FastAPI and Uvicorn (for API)
 - Requests (for API client)
@@ -216,7 +220,8 @@ protrait-validation-OpenCVYOLO/
 │   ├── validator.py          # Core validation logic
 │   ├── validation_config.py  # Validation configuration classes
 │   ├── models.py             # Pydantic models for API
-│   └── gui.py                # GUI application
+│   ├── gui.py                # Legacy tkinter GUI application (deprecated)
+│   └── gradio_gui.py         # New Gradio GUI application
 ├── models/                   # AI model files (auto-downloaded)
 │   ├── deploy.prototxt       # Face detection model architecture
 │   ├── lbfmodel.yaml         # Facial landmark detection model
