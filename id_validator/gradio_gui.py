@@ -237,7 +237,61 @@ class IDPhotoValidatorGradio:
 
     def _create_interface(self):
         """Create the Gradio interface."""
-        with gr.Blocks(title="ID Photo Validator", theme=gr.themes.Soft()) as demo:
+        with gr.Blocks(
+            title="ID Photo Validator",
+            theme=gr.themes.Soft(),
+            css="""
+            /* Highlight primary validate button */
+            #validate-btn button {
+                font-size: 1.05rem !important;
+                font-weight: 600 !important;
+                letter-spacing: .5px;
+                padding: 0.95rem 1.4rem !important;
+                border: 2px solid #8b5cf6 !important;
+                background: linear-gradient(90deg,#6366F1,#8B5CF6,#6366F1) !important;
+                background-size: 200% 100%;
+                animation: validateGradient 6s linear infinite, validatePulse 2.4s ease-in-out infinite;
+                box-shadow: 0 0 0 0 rgba(139,92,246,.55), 0 4px 14px -4px rgba(0,0,0,.55);
+                transition: transform .25s ease, box-shadow .25s ease;
+            }
+            #validate-btn button:hover {
+                transform: translateY(-2px) scale(1.02);
+                animation: validateGradient 4s linear infinite, validatePulseHover 1.6s ease-in-out infinite;
+                box-shadow: 0 0 0 4px rgba(139,92,246,.25), 0 8px 20px -6px rgba(0,0,0,.65);
+            }
+            #validate-btn button:active { transform: translateY(0) scale(.99); }
+            #validate-btn button:disabled { filter: grayscale(.4) brightness(.8); animation: none; opacity:.65; }
+            @keyframes validateGradient { 0%{background-position:0 0}100%{background-position:200% 0} }
+            @keyframes validatePulse { 0%{box-shadow:0 0 0 0 rgba(139,92,246,.55)} 70%{box-shadow:0 0 0 14px rgba(139,92,246,0)} 100%{box-shadow:0 0 0 0 rgba(139,92,246,0)} }
+            @keyframes validatePulseHover { 0%{box-shadow:0 0 0 0 rgba(139,92,246,.55)} 60%{box-shadow:0 0 0 18px rgba(139,92,246,0)} 100%{box-shadow:0 0 0 0 rgba(139,92,246,0)} }
+            /* Optional subtle arrow cue */
+            #validate-btn button::after { content:" →"; font-weight:700; }
+            /* Process Folder button mirrors styling */
+            #process-btn button {
+                font-size: 1.0rem !important;
+                font-weight: 600 !important;
+                letter-spacing: .5px;
+                padding: 0.85rem 1.3rem !important;
+                border: 2px solid #10b981 !important;
+                background: linear-gradient(90deg,#059669,#10b981,#059669) !important;
+                background-size: 200% 100%;
+                animation: processGradient 6s linear infinite, processPulse 2.8s ease-in-out infinite;
+                box-shadow: 0 0 0 0 rgba(16,185,129,.55), 0 4px 14px -4px rgba(0,0,0,.55);
+                transition: transform .25s ease, box-shadow .25s ease;
+            }
+            #process-btn button:hover {
+                transform: translateY(-2px) scale(1.02);
+                animation: processGradient 4s linear infinite, processPulseHover 1.8s ease-in-out infinite;
+                box-shadow: 0 0 0 4px rgba(16,185,129,.25), 0 8px 20px -6px rgba(0,0,0,.65);
+            }
+            #process-btn button:active { transform: translateY(0) scale(.99); }
+            #process-btn button:disabled { filter: grayscale(.4) brightness(.85); animation:none; opacity:.65; }
+            #process-btn button::after { content:" ↻"; font-weight:700; }
+            @keyframes processGradient { 0%{background-position:0 0}100%{background-position:200% 0} }
+            @keyframes processPulse { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)} 70%{box-shadow:0 0 0 14px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+            @keyframes processPulseHover { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)} 60%{box-shadow:0 0 0 18px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+            """
+        ) as demo:
             gr.Markdown("# ID Photo Validator")
             gr.Markdown("Validate ID photos against institutional standards with configurable criteria.")
             
@@ -247,7 +301,7 @@ class IDPhotoValidatorGradio:
                     with gr.Row():
                         with gr.Column():
                             image_input = gr.Image(type="filepath", label="Upload Image")
-                            validate_btn = gr.Button("Validate Image", variant="primary")
+                            validate_btn = gr.Button("Validate Image", variant="primary", elem_id="validate-btn", interactive=False)
                             
                             # Preset configurations
                             gr.Markdown("### Validation Presets")
@@ -305,6 +359,12 @@ class IDPhotoValidatorGradio:
                             annotated_output = gr.Image(label="Annotated Image")
                 
                     # Validation function
+                    # Enable button only when an image is selected
+                    def enable_validate(img_path):
+                        return gr.update(interactive=bool(img_path))
+
+                    image_input.change(enable_validate, inputs=[image_input], outputs=[validate_btn])
+
                     validate_btn.click(
                         self.validate_single_image,
                         inputs=[
@@ -388,7 +448,7 @@ class IDPhotoValidatorGradio:
                                 ]
                             )
                             
-                            process_btn = gr.Button("Process Folder", variant="primary")
+                            process_btn = gr.Button("Process Folder", variant="primary", elem_id="process-btn", interactive=False)
                             progress_output = gr.Textbox(label="Progress", interactive=False)
                             
                         with gr.Column():
@@ -531,6 +591,12 @@ class IDPhotoValidatorGradio:
                         yield final_summary, gallery_items, table_rows
 
                     # Hook streaming processor
+                    # Enable process button only when folder path present
+                    def enable_process(path):
+                        return gr.update(interactive=bool(path and path.strip()))
+
+                    folder_input.change(enable_process, inputs=[folder_input], outputs=[process_btn])
+
                     process_btn.click(
                         stream_batch_results,
                         inputs=[
