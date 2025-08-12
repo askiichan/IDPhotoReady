@@ -2,10 +2,10 @@
 
 A program that checks if a photo is suitable for use on an ID document.
 
-<details open>
-<summary><strong>Test Images</strong></summary>
+![Web GUI](Web-GUI.png)
 
-Update the "Result" lines manually after running validation. (Tip: keep results brief: PASS / FAIL + key reasons.)
+<details open>
+<summary><strong>Testing Result</strong></summary>
 
 |                                                                 Image                                                                  |                                                                  Image                                                                  |                                                                 Image                                                                  |                                                               Image                                                               |
 | :------------------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------------------: |
