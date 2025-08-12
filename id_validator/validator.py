@@ -16,7 +16,8 @@ from .config import (
     MIN_SKIN_PERCENTAGE, MAX_UNIFORM_BLOCK_RATIO, UNIFORM_COLOR_STD_THRESHOLD,
     MIN_EDGE_DENSITY, MIN_COLOR_VARIANCE, MAX_DARK_PIXEL_RATIO, MAX_BRIGHT_PIXEL_RATIO,
     DARK_PIXEL_THRESHOLD, BRIGHT_PIXEL_THRESHOLD,
-    BG_SAMPLE_BORDER_PCT, BG_MIN_MEAN_V, BG_MAX_MEAN_S, BG_MAX_V_STD
+    BG_SAMPLE_BORDER_PCT, BG_MIN_MEAN_V, BG_MAX_MEAN_S, BG_MAX_V_STD,
+    SHOULDER_VISIBILITY_THRESHOLD, MAX_SHOULDER_TILT_DEG, MIN_SHOULDER_WIDTH_TO_FACE_RATIO
 )
 from .validation_config import ValidationConfig, DEFAULT_CONFIG
 
@@ -34,11 +35,21 @@ try:
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5
     )
+    # Initialize MediaPipe Pose (for shoulder balance)
+    mp_pose = mp.solutions.pose
+    pose_detector = mp_pose.Pose(
+        static_image_mode=True,
+        model_complexity=0,  # fastest variant
+        enable_segmentation=False,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
     
     models_loaded = True
 except (cv2.error, ImportError) as e:
     models_loaded = False
     hands_detector = None
+    pose_detector = None
     print(f"Error loading models: {e}. Please run the main script to download them.")
 
 # --- Landmark Drawing Utility (lines instead of individual dots) ---
@@ -484,6 +495,63 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
                     
                     if hands_detected_near_face:
                         reasons.append("Hand detected near or covering the face area. Please remove hands from the face region.")
+
+            # --- Shoulder Balance Validation ---
+            if getattr(config, 'shoulder_balance_validation', False) and 'pose_detector' in globals() and pose_detector is not None:
+                try:
+                    rgb_full = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # MediaPipe expects RGB
+                    pose_results = pose_detector.process(rgb_full)
+                    if pose_results.pose_landmarks:
+                        lmk = pose_results.pose_landmarks.landmark
+                        # Shoulder landmark indices for MediaPipe Pose (BlazePose): 11=left, 12=right
+                        left_sh = lmk[11]
+                        right_sh = lmk[12]
+                        vis_thr = SHOULDER_VISIBILITY_THRESHOLD
+                        if left_sh.visibility >= vis_thr and right_sh.visibility >= vis_thr:
+                            lx, ly = int(left_sh.x * w), int(left_sh.y * h)
+                            rx, ry = int(right_sh.x * w), int(right_sh.y * h)
+
+                            # Ensure left (smaller x) and right (larger x) ordering to avoid 180° angle artifact
+                            if lx > rx:
+                                lx, rx = rx, lx
+                                ly, ry = ry, ly
+
+                            in_frame = (0 <= lx < w and 0 <= rx < w and 0 <= ly < h and 0 <= ry < h)
+                            # Shoulders should appear below ~ lower portion of face box (y bigger than face bottom - small margin)
+                            below_face = (ly > endY - 0.15 * face_h) and (ry > endY - 0.15 * face_h)
+                            shoulder_width = abs(rx - lx)
+                            width_ok = shoulder_width >= MIN_SHOULDER_WIDTH_TO_FACE_RATIO * face_w
+
+                            # Compute tilt relative to horizontal.
+                            dy = ry - ly
+                            dx = rx - lx
+                            angle_deg = abs(np.degrees(np.arctan2(dy, dx)))  # 0 = perfect horizontal
+                            # Normalize: if numerical issues produce >90° (shouldn't after ordering), map to acute angle
+                            if angle_deg > 90:
+                                angle_deg = 180 - angle_deg
+                            tilt_ok = angle_deg <= MAX_SHOULDER_TILT_DEG
+
+                            if not in_frame:
+                                reasons.append("Shoulders appear cropped (not fully inside frame).")
+                            if not below_face:
+                                reasons.append("Shoulders not clearly visible below face region.")
+                            if not width_ok:
+                                reasons.append(f"Shoulder width too small relative to face (width={shoulder_width}px).")
+                            if not tilt_ok:
+                                reasons.append(f"Shoulders not level (tilt {angle_deg:.1f}° > {MAX_SHOULDER_TILT_DEG}°).")
+
+                            if annotated_image is not None:
+                                color = (0, 255, 0) if (in_frame and below_face and width_ok and tilt_ok) else (0, 0, 255)
+                                cv2.circle(annotated_image, (lx, ly), 5, color, -1)
+                                cv2.circle(annotated_image, (rx, ry), 5, color, -1)
+                                cv2.line(annotated_image, (lx, ly), (rx, ry), color, 2)
+                                cv2.putText(annotated_image, f"Tilt {angle_deg:.1f}°", (min(lx, rx), min(ly, ry) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                        else:
+                            reasons.append("Both shoulders not confidently detected (low visibility).")
+                    else:
+                        reasons.append("Upper body pose not detected; ensure shoulders are visible.")
+                except Exception as e:
+                    reasons.append(f"Shoulder balance check error: {e}")
         
         # Draw landmarks only if detection succeeds
         if annotated_image is not None:

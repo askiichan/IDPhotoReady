@@ -21,6 +21,7 @@ class ValidationConfig:
     mouth_validation: bool = True
     quality_assessment: bool = True
     background_validation: bool = True
+    shoulder_balance_validation: bool = False
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -32,6 +33,7 @@ class ValidationConfig:
             'mouth_validation': self.mouth_validation,
             'quality_assessment': self.quality_assessment,
             'background_validation': self.background_validation
+            , 'shoulder_balance_validation': self.shoulder_balance_validation
         }
     
     @classmethod
@@ -45,6 +47,7 @@ class ValidationConfig:
             mouth_validation=config_dict.get('mouth_validation', True),
             quality_assessment=config_dict.get('quality_assessment', True),
             background_validation=config_dict.get('background_validation', True)
+            , shoulder_balance_validation=config_dict.get('shoulder_balance_validation', True)
         )
     
     def get_enabled_categories(self) -> list:
@@ -64,6 +67,8 @@ class ValidationConfig:
             enabled.append("Quality Assessment")
         if self.background_validation:
             enabled.append("Background Validation")
+        if self.shoulder_balance_validation:
+            enabled.append("Shoulder Balance Validation")
         return enabled
 
 # Default configuration
@@ -78,6 +83,7 @@ STRICT_CONFIG = ValidationConfig(
     mouth_validation=True,
     quality_assessment=True,
     background_validation=True
+    , shoulder_balance_validation=True
 )
 
 BASIC_CONFIG = ValidationConfig(
@@ -88,6 +94,7 @@ BASIC_CONFIG = ValidationConfig(
     mouth_validation=False,
     quality_assessment=False,
     background_validation=True
+    , shoulder_balance_validation=False
 )
 
 LENIENT_CONFIG = ValidationConfig(
@@ -98,4 +105,5 @@ LENIENT_CONFIG = ValidationConfig(
     mouth_validation=False,
     quality_assessment=False,
     background_validation=False
+    , shoulder_balance_validation=False
 )

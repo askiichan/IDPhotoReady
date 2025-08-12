@@ -60,3 +60,11 @@ BG_MIN_MEAN_V = 190
 BG_MAX_MEAN_S = 60
 # Maximum standard deviation on brightness to still be considered uniform background
 BG_MAX_V_STD = 60
+
+# --- Shoulder Balance / Upper Body Validation Thresholds ---
+# Minimum visibility (MediaPipe Pose landmark visibility score) required for shoulder landmarks
+SHOULDER_VISIBILITY_THRESHOLD = 0.50
+# Maximum allowed tilt angle between the two shoulders (degrees). Larger implies the subject is leaning.
+MAX_SHOULDER_TILT_DEG = 8.0
+# Minimum shoulder width (distance between left/right shoulders) relative to detected face width.
+MIN_SHOULDER_WIDTH_TO_FACE_RATIO = 0.80

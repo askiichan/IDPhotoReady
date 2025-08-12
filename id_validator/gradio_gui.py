@@ -86,7 +86,8 @@ class IDPhotoValidatorGradio:
                                  obstruction_detection: bool,
                                  mouth_validation: bool,
                                  quality_assessment: bool,
-                                 background_validation: bool) -> ValidationConfig:
+                                 background_validation: bool,
+                                 shoulder_balance_validation: bool) -> ValidationConfig:
         """Create validation configuration from individual settings."""
         return ValidationConfig(
             face_sizing=face_sizing,
@@ -95,12 +96,16 @@ class IDPhotoValidatorGradio:
             obstruction_detection=obstruction_detection,
             mouth_validation=mouth_validation,
             quality_assessment=quality_assessment,
-            background_validation=background_validation
+            background_validation=background_validation,
+            shoulder_balance_validation=shoulder_balance_validation
         )
 
     # -------------------------- Internal Utility Helpers --------------------------
     def _build_config_from_flags(self, *flags: bool) -> ValidationConfig:
-        """Convenience: accepts ordered bool flags matching ValidationConfig fields."""
+        """Convenience: accepts ordered bool flags matching ValidationConfig fields.
+        Expected order: face_sizing, landmark_analysis, eye_validation, obstruction_detection,
+        mouth_validation, quality_assessment, background_validation, shoulder_balance_validation
+        """
         return self._create_validation_config(*flags)
 
     def _add_status_badge(self, image_rgb: np.ndarray, status: str) -> np.ndarray:
@@ -189,7 +194,8 @@ class IDPhotoValidatorGradio:
                               obstruction_detection: bool,
                               mouth_validation: bool,
                               quality_assessment: bool,
-                              background_validation: bool) -> Tuple[str, Optional[np.ndarray], List[List[Any]]]:
+                              background_validation: bool,
+                              shoulder_balance_validation: bool) -> Tuple[str, Optional[np.ndarray], List[List[Any]]]:
         """Validate a single image and return results."""
         if self.models_downloading:
             return "Please wait for models to finish downloading.", None, []
@@ -201,7 +207,8 @@ class IDPhotoValidatorGradio:
         config = self._build_config_from_flags(
             face_sizing, landmark_analysis, eye_validation,
             obstruction_detection, mouth_validation,
-            quality_assessment, background_validation
+            quality_assessment, background_validation,
+            shoulder_balance_validation
         )
         self.validation_config = config
 
@@ -235,7 +242,8 @@ class IDPhotoValidatorGradio:
                       obstruction_detection: bool,
                       mouth_validation: bool,
                       quality_assessment: bool,
-                      background_validation: bool) -> Tuple[str, List]:
+                      background_validation: bool,
+                      shoulder_balance_validation: bool) -> Tuple[str, List]:
         """Process all images in a folder and return batch results."""
         if self.models_downloading:
             return "Please wait for models to finish downloading.", []
@@ -255,7 +263,8 @@ class IDPhotoValidatorGradio:
         config = self._build_config_from_flags(
             face_sizing, landmark_analysis, eye_validation,
             obstruction_detection, mouth_validation,
-            quality_assessment, background_validation
+            quality_assessment, background_validation,
+            shoulder_balance_validation
         )
         self.validation_config = config
 
@@ -373,6 +382,9 @@ class IDPhotoValidatorGradio:
                                 with gr.Row(elem_classes=["option-row"]):
                                     background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
                                     gr.Markdown("<span class='option-note'>(white / uniform background)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    shoulder_balance_validation_cb = gr.Checkbox(label="Shoulder Balance", value=False)
+                                    gr.Markdown("<span class='option-note'>(level & visible shoulders)</span>")
                             
                         with gr.Column():
                             single_summary = gr.Textbox(label="Result Summary", lines=2, interactive=False)
@@ -403,7 +415,8 @@ class IDPhotoValidatorGradio:
                             obstruction_detection_cb,
                             mouth_validation_cb,
                             quality_assessment_cb,
-                            background_validation_cb
+                            background_validation_cb,
+                            shoulder_balance_validation_cb
                         ],
                         outputs=[single_summary, annotated_output, single_table]
                     )
@@ -465,6 +478,9 @@ class IDPhotoValidatorGradio:
                                 with gr.Row(elem_classes=["option-row"]):
                                     batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
                                     gr.Markdown("<span class='option-note'>(white / uniform background)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_shoulder_balance_validation_cb = gr.Checkbox(label="Shoulder Balance", value=False)
+                                    gr.Markdown("<span class='option-note'>(level & visible shoulders)</span>")
                             
                             process_btn = gr.Button("Process Folder", variant="primary", elem_id="process-btn", interactive=False)
                             progress_output = gr.Textbox(label="Progress", interactive=False)
@@ -484,7 +500,8 @@ class IDPhotoValidatorGradio:
                     def stream_batch_results(folder_path,
                                               face_sizing, landmark_analysis, eye_validation,
                                               obstruction_detection, mouth_validation,
-                                              quality_assessment, background_validation):
+                                              quality_assessment, background_validation,
+                                              shoulder_balance_validation):
                         if self.models_downloading:
                             yield "Please wait for models to finish downloading.", [], []
                             return
@@ -503,7 +520,8 @@ class IDPhotoValidatorGradio:
                         config = self._build_config_from_flags(
                             face_sizing, landmark_analysis, eye_validation,
                             obstruction_detection, mouth_validation,
-                            quality_assessment, background_validation
+                            quality_assessment, background_validation,
+                            shoulder_balance_validation
                         )
                         self.validation_config = config
 
@@ -558,7 +576,8 @@ class IDPhotoValidatorGradio:
                             batch_obstruction_detection_cb,
                             batch_mouth_validation_cb,
                             batch_quality_assessment_cb,
-                            batch_background_validation_cb
+                            batch_background_validation_cb,
+                            batch_shoulder_balance_validation_cb
                         ],
                         outputs=[progress_output, gallery_output, results_table]
                     )
