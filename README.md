@@ -14,6 +14,7 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 - **Obstruction Detection**: Identifies hands, objects, or other obstructions covering the face
 - **Mouth Validation**: Checks for proper mouth visibility and positioning
 - **Background Validation**: Verifies that the photo background is mostly white and uniform using HSV analysis on a ring around the detected face (annotates sampled region)
+- **Shoulder Balance (Optional)**: Upper‑body pose check ensuring both shoulders are visible, level, and not excessively cropped (MediaPipe Pose)
 
 ### Configurable Validation Categories
 
@@ -24,6 +25,8 @@ A professional-grade ID photo validation system using OpenCV and machine learnin
 - **Mouth Validation**: Mouth visibility and positioning checks
 - **Quality Assessment**: Cartoon/drawing detection and image quality analysis
 - **Background Validation**: White/neutral, uniform background check (toggleable)
+- **Shoulder Balance Validation**: Detects and evaluates shoulder visibility, horizontal alignment (tilt), and proportional width below the face
+- **Shoulder Balance Validation**: Shoulder visibility & leveling (off by default; enabled in Strict preset)
 
 ### User Interfaces
 
@@ -199,6 +202,21 @@ The system validates photos against configurable criteria organized into categor
 
 #### Quality Assessment
 
+#### Shoulder Balance Validation
+
+Uses MediaPipe Pose to locate left and right shoulder landmarks (indices 11 & 12). Pass/fail logic:
+
+- Both shoulders must have visibility ≥ `SHOULDER_VISIBILITY_THRESHOLD` (default 0.50)
+- Shoulders must be fully inside the frame
+- Shoulder y‑coordinates must lie below the lower portion of the detected face box (ensures upper torso is visible)
+- Shoulder width ≥ `MIN_SHOULDER_WIDTH_TO_FACE_RATIO * face_width` (default 0.80) to prevent overly tight crops
+- Absolute tilt angle ≤ `MAX_SHOULDER_TILT_DEG` (default 8°). Angle is normalized 0–90° after ordering shoulders left→right.
+
+Failure reasons added (examples):
+`Shoulders not level (tilt 12.3° > 8.0°).`, `Shoulder width too small relative to face`, `Both shoulders not confidently detected (low visibility).`
+
+Disabled by default in the GUI (checkbox "Shoulder Balance"). Enabled automatically in the Strict preset; off in Basic & Lenient.
+
 - Image must not be a cartoon or drawing
 - Color complexity analysis using KMeans clustering
 - Image quality and clarity validation
@@ -244,6 +262,7 @@ protrait-validation-OpenCVYOLO/
 - **Eye Analysis**: Eye Aspect Ratio (EAR) calculation
 - **Quality Assessment**: KMeans clustering for cartoon detection
 - **Skin Detection**: HSV color space analysis
+- **Hand / Pose Detection**: MediaPipe Hands (obstruction) & MediaPipe Pose (shoulder balance)
 
 ### Configuration System
 
@@ -270,6 +289,20 @@ Tips for tuning:
 - If clean white backgrounds are failing: lower `BG_MIN_MEAN_V` (e.g., 185) or increase `BG_MAX_MEAN_S` (e.g., 70).
 - If colored backgrounds are slipping through: raise `BG_MIN_MEAN_V` or lower `BG_MAX_MEAN_S` back toward stricter values.
 - Increase `BG_SAMPLE_BORDER_PCT` slightly (e.g., 0.10) if the sampled ring is too close to hair/shoulders; decrease if images are tightly cropped.
+
+#### Shoulder Balance thresholds
+
+Constants in `id_validator/config.py`:
+
+- `SHOULDER_VISIBILITY_THRESHOLD` (default 0.50) – minimum MediaPipe visibility score for each shoulder landmark.
+- `MAX_SHOULDER_TILT_DEG` (default 8.0) – maximum allowed shoulder line tilt.
+- `MIN_SHOULDER_WIDTH_TO_FACE_RATIO` (default 0.80) – minimum shoulder span relative to face width.
+
+Tuning guidance:
+
+- Photos with slight natural posture variance failing: raise `MAX_SHOULDER_TILT_DEG` (e.g., 10–12).
+- Wide crops passing despite distant shoulders: raise `MIN_SHOULDER_WIDTH_TO_FACE_RATIO`.
+- Frequent missed shoulders in dim images: lower `SHOULDER_VISIBILITY_THRESHOLD` to 0.40 (may increase false positives).
 
 ### Dependencies
 
