@@ -100,7 +100,6 @@ class IDPhotoValidatorGradio:
 
     def validate_single_image(self, 
                               image_path: str,
-                              preset: str,
                               face_sizing: bool,
                               landmark_analysis: bool,
                               eye_validation: bool,
@@ -115,21 +114,12 @@ class IDPhotoValidatorGradio:
         if not image_path:
             return "Please upload an image.", "", None, 0.0
 
-        # Create validation config
-        if preset != "Custom":
-            # Use preset configuration
-            config_dict = self._update_config_from_presets(preset)
-            if config_dict:
-                config = ValidationConfig(**config_dict)
-            else:
-                config = self.validation_config
-        else:
-            # Use custom configuration
-            config = self._create_validation_config(
-                face_sizing, landmark_analysis, eye_validation,
-                obstruction_detection, mouth_validation,
-                quality_assessment, background_validation
-            )
+        # Always use explicit user configuration (presets removed)
+        config = self._create_validation_config(
+            face_sizing, landmark_analysis, eye_validation,
+            obstruction_detection, mouth_validation,
+            quality_assessment, background_validation
+        )
         
         self.validation_config = config
 
@@ -158,7 +148,6 @@ class IDPhotoValidatorGradio:
 
     def process_batch(self, 
                       folder_path: str,
-                      preset: str,
                       face_sizing: bool,
                       landmark_analysis: bool,
                       eye_validation: bool,
@@ -182,21 +171,12 @@ class IDPhotoValidatorGradio:
         if not image_files:
             return "No image files found in the selected folder.", []
 
-        # Create validation config
-        if preset != "Custom":
-            # Use preset configuration
-            config_dict = self._update_config_from_presets(preset)
-            if config_dict:
-                config = ValidationConfig(**config_dict)
-            else:
-                config = self.validation_config
-        else:
-            # Use custom configuration
-            config = self._create_validation_config(
-                face_sizing, landmark_analysis, eye_validation,
-                obstruction_detection, mouth_validation,
-                quality_assessment, background_validation
-            )
+        # Always use explicit user configuration
+        config = self._create_validation_config(
+            face_sizing, landmark_analysis, eye_validation,
+            obstruction_detection, mouth_validation,
+            quality_assessment, background_validation
+        )
         
         self.validation_config = config
 
@@ -303,56 +283,16 @@ class IDPhotoValidatorGradio:
                             image_input = gr.Image(type="filepath", label="Upload Image")
                             validate_btn = gr.Button("Validate Image", variant="primary", elem_id="validate-btn", interactive=False)
                             
-                            # Preset configurations
-                            gr.Markdown("### Validation Presets")
-                            preset_radio = gr.Radio(
-                                choices=["Strict (All)", "Basic", "Lenient", "Custom"],
-                                value="Strict (All)",
-                                label="Configuration Preset"
-                            )
-                            
-                            # Configuration list (always visible now)
-                            with gr.Group() as custom_config:  # kept variable name for minimal downstream changes
-                                gr.Markdown("### Custom Configuration")
+                            # Validation Options (presets removed; direct selection)
+                            gr.Markdown("### Validation Options")
+                            with gr.Group() as custom_config:
                                 face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
                                 landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
                                 eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
                                 obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
                                 mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
                                 quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
-                                background_validation_cb = gr.Checkbox(label="Background Validation", value=True)
-
-                            # Update checkbox states when a preset (non-Custom) is chosen so user can see values
-                            def update_config_values(preset):
-                                cfg = self._update_config_from_presets(preset)
-                                if not cfg:  # Custom => don't override manual selections
-                                    return [
-                                        gr.update(), gr.update(), gr.update(),
-                                        gr.update(), gr.update(), gr.update(), gr.update()
-                                    ]
-                                return [
-                                    gr.update(value=cfg["face_sizing"]),
-                                    gr.update(value=cfg["landmark_analysis"]),
-                                    gr.update(value=cfg["eye_validation"]),
-                                    gr.update(value=cfg["obstruction_detection"]),
-                                    gr.update(value=cfg["mouth_validation"]),
-                                    gr.update(value=cfg["quality_assessment"]),
-                                    gr.update(value=cfg["background_validation"])
-                                ]
-
-                            preset_radio.change(
-                                update_config_values,
-                                inputs=[preset_radio],
-                                outputs=[
-                                    face_sizing_cb,
-                                    landmark_analysis_cb,
-                                    eye_validation_cb,
-                                    obstruction_detection_cb,
-                                    mouth_validation_cb,
-                                    quality_assessment_cb,
-                                    background_validation_cb
-                                ]
-                            )
+                                background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
                             
                         with gr.Column():
                             result_output = gr.Textbox(label="Validation Result", lines=10, interactive=False)
@@ -369,7 +309,6 @@ class IDPhotoValidatorGradio:
                         self.validate_single_image,
                         inputs=[
                             image_input,
-                            preset_radio,
                             face_sizing_cb,
                             landmark_analysis_cb,
                             eye_validation_cb,
@@ -414,39 +353,16 @@ class IDPhotoValidatorGradio:
                                 outputs=[folder_input]
                             )
                             
-                            # Preset configurations
-                            gr.Markdown("### Validation Presets")
-                            batch_preset_radio = gr.Radio(
-                                choices=["Strict (All)", "Basic", "Lenient", "Custom"],
-                                value="Strict (All)",
-                                label="Configuration Preset"
-                            )
-                            
-                            # Configuration list (always visible now for batch)
-                            with gr.Group() as batch_custom_config:  # keep variable name
-                                gr.Markdown("### Custom Configuration")
+                            # Validation Options for batch
+                            gr.Markdown("### Validation Options")
+                            with gr.Group() as batch_custom_config:
                                 batch_face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
                                 batch_landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
                                 batch_eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
                                 batch_obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
                                 batch_mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
                                 batch_quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
-                                batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=True)
-
-                            # Batch preset change should also reflect values in checkboxes
-                            batch_preset_radio.change(
-                                update_config_values,
-                                inputs=[batch_preset_radio],
-                                outputs=[
-                                    batch_face_sizing_cb,
-                                    batch_landmark_analysis_cb,
-                                    batch_eye_validation_cb,
-                                    batch_obstruction_detection_cb,
-                                    batch_mouth_validation_cb,
-                                    batch_quality_assessment_cb,
-                                    batch_background_validation_cb
-                                ]
-                            )
+                                batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
                             
                             process_btn = gr.Button("Process Folder", variant="primary", elem_id="process-btn", interactive=False)
                             progress_output = gr.Textbox(label="Progress", interactive=False)
@@ -463,7 +379,7 @@ class IDPhotoValidatorGradio:
                             )
                     
                     # Streaming batch processor to show progress and detailed results
-                    def stream_batch_results(folder_path, preset,
+                    def stream_batch_results(folder_path,
                                               face_sizing, landmark_analysis, eye_validation,
                                               obstruction_detection, mouth_validation,
                                               quality_assessment, background_validation):
@@ -482,19 +398,12 @@ class IDPhotoValidatorGradio:
                             yield "No image files found in the selected folder.", [], []
                             return
 
-                        # Config
-                        if preset != "Custom":
-                            config_dict = self._update_config_from_presets(preset)
-                            if config_dict:
-                                config = ValidationConfig(**config_dict)
-                            else:
-                                config = self.validation_config
-                        else:
-                            config = self._create_validation_config(
-                                face_sizing, landmark_analysis, eye_validation,
-                                obstruction_detection, mouth_validation,
-                                quality_assessment, background_validation
-                            )
+                        # Config (direct from user choices)
+                        config = self._create_validation_config(
+                            face_sizing, landmark_analysis, eye_validation,
+                            obstruction_detection, mouth_validation,
+                            quality_assessment, background_validation
+                        )
                         self.validation_config = config
 
                         total = len(image_files)
@@ -601,7 +510,6 @@ class IDPhotoValidatorGradio:
                         stream_batch_results,
                         inputs=[
                             folder_input,
-                            batch_preset_radio,
                             batch_face_sizing_cb,
                             batch_landmark_analysis_cb,
                             batch_eye_validation_cb,
@@ -612,21 +520,6 @@ class IDPhotoValidatorGradio:
                         ],
                         outputs=[progress_output, gallery_output, results_table]
                     )
-            
-            # Footer
-            gr.Markdown("---")
-            gr.Markdown("### Validation Categories")
-            gr.Markdown("""
-            - **Core (Always On)**: File Handling, Face Detection
-            - **Configurable**: 
-              - Face Sizing
-              - Landmark Analysis
-              - Eye Validation
-              - Obstruction Detection
-              - Mouth Validation
-              - Quality Assessment
-              - Background Validation
-            """)
         
         return demo
 
