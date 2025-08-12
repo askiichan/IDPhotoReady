@@ -6,7 +6,7 @@ import os
 import cv2
 import time
 import threading
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 import numpy as np
 import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
@@ -106,13 +106,13 @@ class IDPhotoValidatorGradio:
                               obstruction_detection: bool,
                               mouth_validation: bool,
                               quality_assessment: bool,
-                              background_validation: bool) -> Tuple[str, str, Optional[np.ndarray], float]:
+                              background_validation: bool) -> Tuple[str, Optional[np.ndarray], List[List[Any]]]:
         """Validate a single image and return results."""
         if self.models_downloading:
-            return "Please wait for models to finish downloading.", "", None, 0.0
+            return "Please wait for models to finish downloading.", None, []
 
         if not image_path:
-            return "Please upload an image.", "", None, 0.0
+            return "Please upload an image.", None, []
 
         # Always use explicit user configuration (presets removed)
         config = self._create_validation_config(
@@ -137,14 +137,51 @@ class IDPhotoValidatorGradio:
             
             result_text += f"\n\nProcessing time: {processing_time:.2f} seconds"
             
-            return result_text, "success" if is_valid else "failure", annotated_img, processing_time
+            # Convert annotated image BGR->RGB and add status badge (to match batch display)
+            if annotated_img is not None and isinstance(annotated_img, np.ndarray) and annotated_img.ndim == 3 and annotated_img.shape[2] == 3:
+                try:
+                    annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+                    # Draw badge via PIL (reuse batch style)
+                    pil_img = Image.fromarray(annotated_img)
+                    draw = ImageDraw.Draw(pil_img)
+                    font = ImageFont.load_default()
+                    status = 'PASSED' if is_valid else 'FAILED'
+                    badge_text = 'OK' if is_valid else 'FAIL'
+                    bg_color = (34,139,34,230) if is_valid else (220,20,60,230)
+                    text_color = (255,255,255,255)
+                    text_w, text_h = draw.textbbox((0,0), badge_text, font=font)[2:]
+                    pad = 4
+                    badge_w = text_w + pad*2
+                    badge_h = text_h + pad*2
+                    W, H = pil_img.size
+                    rect_xy = [W - badge_w - 5, 5, W - 5, 5 + badge_h]
+                    draw.rectangle(rect_xy, fill=bg_color)
+                    draw.text((rect_xy[0]+pad, rect_xy[1]+pad-1), badge_text, font=font, fill=text_color)
+                    annotated_img = np.asarray(pil_img)
+                except Exception:
+                    pass
+            summary = f"File: {os.path.basename(image_path)} - {'PASSED' if is_valid else 'FAILED'} ({processing_time:.2f}s)"
+            table_rows = [[
+                os.path.basename(image_path),
+                'PASSED' if is_valid else 'FAILED',
+                "; ".join(reasons) if reasons else "",
+                round(processing_time, 2)
+            ]]
+            return summary, annotated_img, table_rows
             
         except Exception as e:
             end_time = time.time()
             processing_time = end_time - start_time
             result_text = f"Validation Failed\n\nAn unexpected error occurred: {str(e)}"
             result_text += f"\n\nProcessing time: {processing_time:.2f} seconds"
-            return result_text, "failure", None, processing_time
+            summary = f"File: {os.path.basename(image_path)} - ERROR ({processing_time:.2f}s)"
+            table_rows = [[
+                os.path.basename(image_path),
+                'ERROR',
+                str(e),
+                round(processing_time, 2)
+            ]]
+            return summary, None, table_rows
 
     def process_batch(self, 
                       folder_path: str,
@@ -295,8 +332,16 @@ class IDPhotoValidatorGradio:
                                 background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
                             
                         with gr.Column():
-                            result_output = gr.Textbox(label="Validation Result", lines=10, interactive=False)
+                            single_summary = gr.Textbox(label="Result Summary", lines=2, interactive=False)
                             annotated_output = gr.Image(label="Annotated Image")
+                            single_table = gr.Dataframe(
+                                headers=["File", "Status", "Reasons", "Time (s)"],
+                                datatype=["str", "str", "str", "number"],
+                                row_count=(0, "dynamic"),
+                                col_count=(4, "fixed"),
+                                interactive=False,
+                                label="Detailed Result"
+                            )
                 
                     # Validation function
                     # Enable button only when an image is selected
@@ -317,7 +362,7 @@ class IDPhotoValidatorGradio:
                             quality_assessment_cb,
                             background_validation_cb
                         ],
-                        outputs=[result_output, gr.State(), annotated_output, gr.State()]
+                        outputs=[single_summary, annotated_output, single_table]
                     )
                 
                 # Batch Processing Tab
