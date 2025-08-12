@@ -27,12 +27,12 @@ class IDPhotoValidatorGradio:
     def __init__(self):
         self.models_downloading = False
         self.validation_config = ValidationConfig()
-        self.batch_results = []
-        
-        # Check and download models if needed
+        self.batch_results: List = []
+        # Centralized image extension tuple (lowercase)
+        self.IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
+        # Ensure required models are present
         self._check_and_download_models()
-        
-        # Create the Gradio interface
+        # Build UI
         self.demo = self._create_interface()
 
     def _check_and_download_models(self):
@@ -98,6 +98,89 @@ class IDPhotoValidatorGradio:
             background_validation=background_validation
         )
 
+    # -------------------------- Internal Utility Helpers --------------------------
+    def _build_config_from_flags(self, *flags: bool) -> ValidationConfig:
+        """Convenience: accepts ordered bool flags matching ValidationConfig fields."""
+        return self._create_validation_config(*flags)
+
+    def _add_status_badge(self, image_rgb: np.ndarray, status: str) -> np.ndarray:
+        """Overlay a small status badge (OK/FAIL/ERR) top-right on an RGB image.
+
+        Silently returns input image if anything unexpected occurs.
+        """
+        try:
+            if image_rgb is None or not isinstance(image_rgb, np.ndarray):
+                return image_rgb
+            if image_rgb.ndim != 3 or image_rgb.shape[2] != 3:
+                return image_rgb
+            pil_img = Image.fromarray(image_rgb)
+            draw = ImageDraw.Draw(pil_img)
+            font = ImageFont.load_default()
+            badge_text = ("OK" if status == "PASSED" else ("ERR" if status == "ERROR" else "FAIL"))
+            if status == "PASSED":
+                bg_color = (34, 139, 34, 230)
+            elif status == "FAILED":
+                bg_color = (220, 20, 60, 230)
+            else:
+                bg_color = (255, 140, 0, 230)
+            text_color = (255, 255, 255, 255)
+            text_w, text_h = draw.textbbox((0, 0), badge_text, font=font)[2:]
+            pad = 4
+            badge_w = text_w + pad * 2
+            badge_h = text_h + pad * 2
+            W, _ = pil_img.size
+            rect_xy = [W - badge_w - 5, 5, W - 5, 5 + badge_h]
+            draw.rectangle(rect_xy, fill=bg_color)
+            draw.text((rect_xy[0] + pad, rect_xy[1] + pad - 1), badge_text, font=font, fill=text_color)
+            return np.asarray(pil_img)
+        except Exception:
+            return image_rgb
+
+    def _validate_image(self, file_path: str, config: ValidationConfig):
+        """Core single-image validation logic shared by single + batch flows.
+
+        Returns tuple: (status(str), reasons(list[str]), processing_time(float), annotated_img(np.ndarray|None))
+        status in {PASSED, FAILED, ERROR}
+        """
+        start_time = time.time()
+        try:
+            is_valid, reasons, annotated_img = validate_id_photo(file_path, return_annotated=True, config=config)
+            processing_time = time.time() - start_time
+            status = "PASSED" if is_valid else "FAILED"
+            return status, reasons, processing_time, annotated_img
+        except Exception as e:
+            return "ERROR", [f"Unexpected error: {e}"], time.time() - start_time, None
+
+    def _prepare_display_image(self, file_path: str, annotated_img: Optional[np.ndarray], status: str) -> Image.Image:
+        """Return a PIL.Image for gallery/display (RGB) with badge.
+
+        Falls back to original image or placeholder if needed.
+        """
+        # Determine base image
+        base_rgb = None
+        try:
+            if annotated_img is not None:
+                if annotated_img.ndim == 3 and annotated_img.shape[2] == 3:
+                    # annotated assumed BGR from OpenCV
+                    base_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+            if base_rgb is None:
+                original = cv2.imread(file_path)
+                if original is not None:
+                    if original.ndim == 3 and original.shape[2] == 3:
+                        base_rgb = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
+            if base_rgb is None:
+                placeholder = np.zeros((100, 100, 3), dtype=np.uint8)
+                placeholder[:, :, 2] = 255
+                base_rgb = placeholder
+        except Exception:
+            placeholder = np.zeros((100, 100, 3), dtype=np.uint8)
+            placeholder[:, :, 2] = 255
+            base_rgb = placeholder
+
+        # Add badge
+        base_rgb = self._add_status_badge(base_rgb, status)
+        return Image.fromarray(base_rgb)
+
     def validate_single_image(self, 
                               image_path: str,
                               face_sizing: bool,
@@ -114,74 +197,35 @@ class IDPhotoValidatorGradio:
         if not image_path:
             return "Please upload an image.", None, []
 
-        # Always use explicit user configuration (presets removed)
-        config = self._create_validation_config(
+        # Build config and store
+        config = self._build_config_from_flags(
             face_sizing, landmark_analysis, eye_validation,
             obstruction_detection, mouth_validation,
             quality_assessment, background_validation
         )
-        
         self.validation_config = config
 
-        start_time = time.time()
-        try:
-            is_valid, reasons, annotated_img = validate_id_photo(image_path, return_annotated=True, config=config)
-            end_time = time.time()
-            processing_time = end_time - start_time
-            
-            # Format results
-            if is_valid:
-                result_text = "Validation Passed!\n\nThe photo meets all requirements."
-            else:
-                result_text = "Validation Failed\n\n" + "\n".join([f"- {reason}" for reason in reasons])
-            
-            result_text += f"\n\nProcessing time: {processing_time:.2f} seconds"
-            
-            # Convert annotated image BGR->RGB and add status badge (to match batch display)
-            if annotated_img is not None and isinstance(annotated_img, np.ndarray) and annotated_img.ndim == 3 and annotated_img.shape[2] == 3:
-                try:
-                    annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-                    # Draw badge via PIL (reuse batch style)
-                    pil_img = Image.fromarray(annotated_img)
-                    draw = ImageDraw.Draw(pil_img)
-                    font = ImageFont.load_default()
-                    status = 'PASSED' if is_valid else 'FAILED'
-                    badge_text = 'OK' if is_valid else 'FAIL'
-                    bg_color = (34,139,34,230) if is_valid else (220,20,60,230)
-                    text_color = (255,255,255,255)
-                    text_w, text_h = draw.textbbox((0,0), badge_text, font=font)[2:]
-                    pad = 4
-                    badge_w = text_w + pad*2
-                    badge_h = text_h + pad*2
-                    W, H = pil_img.size
-                    rect_xy = [W - badge_w - 5, 5, W - 5, 5 + badge_h]
-                    draw.rectangle(rect_xy, fill=bg_color)
-                    draw.text((rect_xy[0]+pad, rect_xy[1]+pad-1), badge_text, font=font, fill=text_color)
-                    annotated_img = np.asarray(pil_img)
-                except Exception:
-                    pass
-            summary = f"File: {os.path.basename(image_path)} - {'PASSED' if is_valid else 'FAILED'} ({processing_time:.2f}s)"
-            table_rows = [[
-                os.path.basename(image_path),
-                'PASSED' if is_valid else 'FAILED',
-                "; ".join(reasons) if reasons else "",
-                round(processing_time, 2)
-            ]]
-            return summary, annotated_img, table_rows
-            
-        except Exception as e:
-            end_time = time.time()
-            processing_time = end_time - start_time
-            result_text = f"Validation Failed\n\nAn unexpected error occurred: {str(e)}"
-            result_text += f"\n\nProcessing time: {processing_time:.2f} seconds"
-            summary = f"File: {os.path.basename(image_path)} - ERROR ({processing_time:.2f}s)"
-            table_rows = [[
-                os.path.basename(image_path),
-                'ERROR',
-                str(e),
-                round(processing_time, 2)
-            ]]
-            return summary, None, table_rows
+        status, reasons, processing_time, annotated_img = self._validate_image(image_path, config)
+
+        # Prepare annotated display (RGB + badge) for PASSED/FAILED only
+        if annotated_img is not None and status in {"PASSED", "FAILED"}:
+            try:
+                annotated_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+                annotated_img = self._add_status_badge(annotated_rgb, status)
+            except Exception:
+                pass
+
+        summary = f"File: {os.path.basename(image_path)} - {status} ({processing_time:.2f}s)"
+        table_rows = [[
+            os.path.basename(image_path),
+            status,
+            "; ".join(reasons) if reasons else "",
+            round(processing_time, 2)
+        ]]
+        # If error, drop image output
+        if status == "ERROR":
+            annotated_img = None
+        return summary, annotated_img, table_rows
 
     def process_batch(self, 
                       folder_path: str,
@@ -200,55 +244,37 @@ class IDPhotoValidatorGradio:
             return "Please select a folder.", []
 
         # Get all image files in the folder
-        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp')
-        image_files = [f for f in os.listdir(folder_path) 
-                      if f.lower().endswith(image_extensions) and 
-                      os.path.isfile(os.path.join(folder_path, f))]
+        image_files = [f for f in os.listdir(folder_path)
+                       if f.lower().endswith(self.IMAGE_EXTENSIONS) and
+                       os.path.isfile(os.path.join(folder_path, f))]
 
         if not image_files:
             return "No image files found in the selected folder.", []
 
         # Always use explicit user configuration
-        config = self._create_validation_config(
+        config = self._build_config_from_flags(
             face_sizing, landmark_analysis, eye_validation,
             obstruction_detection, mouth_validation,
             quality_assessment, background_validation
         )
-        
         self.validation_config = config
 
         # Process each image
-        results = []
+        results: List[Tuple[str, str, str, float, Optional[np.ndarray]]] = []
         total_files = len(image_files)
         passed_count = 0
         failed_count = 0
-        
-        for i, filename in enumerate(image_files):
+
+        for filename in image_files:
             file_path = os.path.join(folder_path, filename)
-            
-            # Validate image
-            try:
-                start_time = time.time()
-                is_valid, reasons, annotated_img = validate_id_photo(file_path, return_annotated=True, config=config)
-                end_time = time.time()
-                processing_time = end_time - start_time
-                
-                # Store results
-                status = "PASSED" if is_valid else "FAILED"
-                reason_text = "\n".join([f"• {reason}" for reason in reasons]) if not is_valid and reasons else ""
-                
-                results.append((file_path, status, reason_text, processing_time, annotated_img))
-                
-                if is_valid:
-                    passed_count += 1
-                else:
-                    failed_count += 1
-                    
-            except Exception as e:
-                results.append((file_path, "ERROR", f"Error: {str(e)}", 0, None))
+            status, reasons, processing_time, annotated_img = self._validate_image(file_path, config)
+            reason_text = "\n".join([f"• {r}" for r in reasons]) if reasons else ""
+            results.append((file_path, status, reason_text, processing_time, annotated_img))
+            if status == "PASSED":
+                passed_count += 1
+            else:
                 failed_count += 1
-        
-        # Create summary
+
         summary = f"Processed {total_files} files: {passed_count} passed, {failed_count} failed"
         return summary, results
 
@@ -435,16 +461,15 @@ class IDPhotoValidatorGradio:
                             yield "Please select a folder.", [], []
                             return
 
-                        image_extensions = ('.jpg', '.jpeg', '.png', '.bmp')
                         image_files = [f for f in os.listdir(folder_path)
-                                       if f.lower().endswith(image_extensions) and
+                                       if f.lower().endswith(self.IMAGE_EXTENSIONS) and
                                        os.path.isfile(os.path.join(folder_path, f))]
                         if not image_files:
                             yield "No image files found in the selected folder.", [], []
                             return
 
                         # Config (direct from user choices)
-                        config = self._create_validation_config(
+                        config = self._build_config_from_flags(
                             face_sizing, landmark_analysis, eye_validation,
                             obstruction_detection, mouth_validation,
                             quality_assessment, background_validation
@@ -464,74 +489,15 @@ class IDPhotoValidatorGradio:
                         for idx, filename in enumerate(image_files):
                             prog((idx + 1) / total, desc=f"Processing {filename}")
                             file_path = os.path.join(folder_path, filename)
-                            try:
-                                start = time.time()
-                                is_valid, reasons, annotated_img = validate_id_photo(file_path, return_annotated=True, config=config)
-                                proc_time = time.time() - start
-                                status = "PASSED" if is_valid else "FAILED"
-                                if is_valid:
-                                    passed += 1
-                                else:
-                                    failed += 1
-                                reason_text = "; ".join(reasons) if reasons else ""
-                            except Exception as e:
-                                status = "ERROR"
-                                reason_text = f"Error: {str(e)}"
-                                proc_time = 0
-                                annotated_img = None
-                                failed += 1
-
-                            # Prepare image for gallery
-                            display_img = None
-                            if annotated_img is not None:
-                                if len(annotated_img.shape) == 3 and annotated_img.shape[2] == 3:
-                                    display_img = Image.fromarray(cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB))
-                                else:
-                                    display_img = Image.fromarray(annotated_img)
+                            status, reasons, proc_time, annotated_img = self._validate_image(file_path, config)
+                            if status == "PASSED":
+                                passed += 1
                             else:
-                                try:
-                                    original_img = cv2.imread(file_path)
-                                    if original_img is not None:
-                                        if len(original_img.shape) == 3 and original_img.shape[2] == 3:
-                                            original_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB)
-                                        display_img = Image.fromarray(original_img)
-                                except Exception:
-                                    placeholder = np.zeros((100, 100, 3), dtype=np.uint8)
-                                    placeholder[:, :, 2] = 255
-                                    display_img = Image.fromarray(placeholder)
+                                failed += 1
+                            reason_text = "; ".join(reasons) if reasons else ""
 
-                            # Overlay status badge (top-right corner)
-                            if display_img is not None:
-                                try:
-                                    img_with_badge = display_img.copy()
-                                    draw = ImageDraw.Draw(img_with_badge)
-                                    font = ImageFont.load_default()
-                                    badge_text = "OK" if status == "PASSED" else ("ERR" if status == "ERROR" else "FAIL")
-                                    # Colors
-                                    if status == "PASSED":
-                                        bg_color = (34, 139, 34, 230)  # green
-                                    elif status == "FAILED":
-                                        bg_color = (220, 20, 60, 230)  # crimson
-                                    else:
-                                        bg_color = (255, 140, 0, 230)  # dark orange
-                                    text_color = (255, 255, 255, 255)
-                                    # Measure text
-                                    text_w, text_h = draw.textbbox((0,0), badge_text, font=font)[2:]
-                                    pad = 4
-                                    badge_w = text_w + pad * 2
-                                    badge_h = text_h + pad * 2
-                                    W, H = img_with_badge.size
-                                    # Rectangle coordinates (top-right)
-                                    rect_xy = [W - badge_w - 5, 5, W - 5, 5 + badge_h]
-                                    # Draw rectangle
-                                    draw.rectangle(rect_xy, fill=bg_color)
-                                    # Draw text centered
-                                    text_x = rect_xy[0] + pad
-                                    text_y = rect_xy[1] + pad - 1
-                                    draw.text((text_x, text_y), badge_text, font=font, fill=text_color)
-                                    display_img = img_with_badge
-                                except Exception:
-                                    pass
+                            # Prepare display image (annotated preferred) with badge
+                            display_img = self._prepare_display_image(file_path, annotated_img, status)
 
                             short_reason = reason_text.split(';')[0][:60] + ('...' if reason_text and len(reason_text.split(';')[0]) > 60 else '')
                             caption = f"{filename}\n{status} ({proc_time:.2f}s)" + (f"\n{short_reason}" if short_reason else "")
