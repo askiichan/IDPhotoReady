@@ -18,7 +18,7 @@ from .config import (
 )
 from .utils import download_file
 from .validator import validate_id_photo
-from .validation_config import ValidationConfig, STRICT_CONFIG, BASIC_CONFIG, LENIENT_CONFIG
+from .validation_config import ValidationConfig
 
 class IDPhotoValidatorGradio:
     """
@@ -57,27 +57,6 @@ class IDPhotoValidatorGradio:
                 print(f"Failed to download models: {e}. Please check your connection and restart.")
             finally:
                 self.models_downloading = False
-
-    def _update_config_from_presets(self, preset: str) -> dict:
-        """Update validation configuration based on selected preset."""
-        if preset == "Strict (All)":
-            config = STRICT_CONFIG
-        elif preset == "Basic":
-            config = BASIC_CONFIG
-        elif preset == "Lenient":
-            config = LENIENT_CONFIG
-        else:  # Custom
-            return {}
-            
-        return {
-            "face_sizing": config.face_sizing,
-            "landmark_analysis": config.landmark_analysis,
-            "eye_validation": config.eye_validation,
-            "obstruction_detection": config.obstruction_detection,
-            "mouth_validation": config.mouth_validation,
-            "quality_assessment": config.quality_assessment,
-            "background_validation": config.background_validation
-        }
 
     def _create_validation_config(self, 
                                  face_sizing: bool,

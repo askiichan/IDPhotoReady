@@ -16,7 +16,7 @@ from .config import (
 )
 from .utils import download_file
 from .validator import validate_id_photo
-from .validation_config import ValidationConfig, STRICT_CONFIG, BASIC_CONFIG, LENIENT_CONFIG
+from .validation_config import ValidationConfig
 
 class IDPhotoValidatorGUI:
     """
@@ -485,10 +485,6 @@ class IDPhotoValidatorGUI:
         preset_frame = ttk.LabelFrame(parent, text="Presets", padding=10)
         preset_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Button(preset_frame, text="Strict (All)", command=self.apply_strict_config).pack(fill=tk.X, pady=2)
-        ttk.Button(preset_frame, text="Basic", command=self.apply_basic_config).pack(fill=tk.X, pady=2)
-        ttk.Button(preset_frame, text="Lenient", command=self.apply_lenient_config).pack(fill=tk.X, pady=2)
-        
         # Individual validation categories
         categories_frame = ttk.LabelFrame(parent, text="Validation Categories", padding=10)
         categories_frame.pack(fill=tk.X, pady=(0, 10))
@@ -530,39 +526,6 @@ class IDPhotoValidatorGUI:
         
         # Update initial status
         self.update_config_status()
-    
-    def apply_strict_config(self):
-        """Apply strict validation configuration."""
-        self.face_sizing_var.set(True)
-        self.landmark_analysis_var.set(True)
-        self.eye_validation_var.set(True)
-        self.obstruction_detection_var.set(True)
-        self.mouth_validation_var.set(True)
-        self.quality_assessment_var.set(True)
-        self.background_validation_var.set(True)
-        self.update_config()
-    
-    def apply_basic_config(self):
-        """Apply basic validation configuration."""
-        self.face_sizing_var.set(True)
-        self.landmark_analysis_var.set(False)
-        self.eye_validation_var.set(True)
-        self.obstruction_detection_var.set(False)
-        self.mouth_validation_var.set(False)
-        self.quality_assessment_var.set(False)
-        self.background_validation_var.set(True)
-        self.update_config()
-    
-    def apply_lenient_config(self):
-        """Apply lenient validation configuration."""
-        self.face_sizing_var.set(False)
-        self.landmark_analysis_var.set(False)
-        self.eye_validation_var.set(False)
-        self.obstruction_detection_var.set(False)
-        self.mouth_validation_var.set(False)
-        self.quality_assessment_var.set(False)
-        self.background_validation_var.set(False)
-        self.update_config()
     
     def update_config(self):
         """Update the validation configuration based on checkbox states."""
@@ -638,10 +601,6 @@ class IDPhotoValidatorGUI:
         # Preset configurations frame
         preset_frame = ttk.LabelFrame(parent, text="Presets", padding=10)
         preset_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Button(preset_frame, text="Strict (All)", command=self.apply_strict_config).pack(fill=tk.X, pady=2)
-        ttk.Button(preset_frame, text="Basic", command=self.apply_basic_config).pack(fill=tk.X, pady=2)
-        ttk.Button(preset_frame, text="Lenient", command=self.apply_lenient_config).pack(fill=tk.X, pady=2)
     
         # Individual validation categories
         categories_frame = ttk.LabelFrame(parent, text="Validation Categories", padding=10)
@@ -684,39 +643,6 @@ class IDPhotoValidatorGUI:
         
         # Update initial status
         self.update_config_status()
-    
-    def apply_strict_config(self):
-        """Apply strict validation configuration."""
-        self.face_sizing_var.set(True)
-        self.landmark_analysis_var.set(True)
-        self.eye_validation_var.set(True)
-        self.obstruction_detection_var.set(True)
-        self.mouth_validation_var.set(True)
-        self.quality_assessment_var.set(True)
-        self.background_validation_var.set(True)
-        self.update_config()
-    
-    def apply_basic_config(self):
-        """Apply basic validation configuration."""
-        self.face_sizing_var.set(True)
-        self.landmark_analysis_var.set(False)
-        self.eye_validation_var.set(True)
-        self.obstruction_detection_var.set(False)
-        self.mouth_validation_var.set(False)
-        self.quality_assessment_var.set(False)
-        self.background_validation_var.set(True)
-        self.update_config()
-    
-    def apply_lenient_config(self):
-        """Apply lenient validation configuration."""
-        self.face_sizing_var.set(False)
-        self.landmark_analysis_var.set(False)
-        self.eye_validation_var.set(False)
-        self.obstruction_detection_var.set(False)
-        self.mouth_validation_var.set(False)
-        self.quality_assessment_var.set(False)
-        self.background_validation_var.set(False)
-        self.update_config()
     
     def update_config(self):
         """Update the validation configuration based on checkbox states."""
