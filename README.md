@@ -1,335 +1,160 @@
-# ID Photo Validator
+# IDPhotoReady
 
-A professional-grade ID photo validation system using OpenCV and machine learning to ensure photos meet standard requirements for official documents.
+A program that checks if a photo is suitable for use on an ID document.
 
-## Features
+## 📋 Table of Contents
 
-### Core Validation
+- [Key Features](#✨-key-features)
+- [Installation](#⚙️-installation)
+- [Usage](#🚀-usage)
+  - [Web GUI](#🖥️-web-gui)
+  - [REST API](#🔌-rest-api)
+- [Validation Options](#✔️-validation-options)
+- [Configuration & Tuning](#🔧-configuration--tuning)
+- [Project Structure](#📂-project-structure)
+- [Troubleshooting](#🚑-troubleshooting)
+- [License](#📄-license)
 
-- **Face Detection**: Uses OpenCV DNN with SSD MobileNet for accurate face detection
-- **Facial Landmarks**: 68-point landmark detection for detailed facial analysis
-- **Eye Validation**: Advanced Eye Aspect Ratio (EAR) calculation to detect closed eyes
-- **Quality Assessment**: Cartoon/drawing detection using color clustering analysis
-- **Size Validation**: Ensures face occupies appropriate portion of image (5-80%)
-- **Obstruction Detection**: Identifies hands, objects, or other obstructions covering the face
-- **Mouth Validation**: Checks for proper mouth visibility and positioning
-- **Background Validation**: Verifies that the photo background is mostly white and uniform using HSV analysis on a ring around the detected face (annotates sampled region)
-- **Shoulder Balance (Optional)**: Upper‑body pose check ensuring both shoulders are visible, level, and not excessively cropped (MediaPipe Pose)
+## ✨ Key Features
 
-### Configurable Validation Categories
+- **🖥️ Dual Interface:** A user-friendly **Web GUI** for easy uploads and a **REST API** for system integration.
+- **✅ Flexible Validation:** Checks for face position, eye state (open/closed), obstructions, background uniformity, shoulder balance, and image quality.
+- **🖼️ Annotated Results:** Provides clear visual feedback on the image, highlighting detected landmarks and specific validation failures.
+- **🚀 Built with Power:** Leverages **OpenCV**, **MediaPipe**, and **scikit-learn** for accurate and reliable analysis.
 
-- **Face Sizing**: Validates face size ratio within image
-- **Landmark Analysis**: Comprehensive facial landmark detection and analysis
-- **Eye Validation**: Closed eye detection using Eye Aspect Ratio (EAR)
-- **Obstruction Detection**: Skin color analysis to detect face coverings
-- **Mouth Validation**: Mouth visibility and positioning checks
-- **Quality Assessment**: Cartoon/drawing detection and image quality analysis
-- **Background Validation**: White/neutral, uniform background check (toggleable)
-- **Shoulder Balance Validation**: Detects and evaluates shoulder visibility, horizontal alignment (tilt), and proportional width below the face
-- **Shoulder Balance Validation**: Shoulder visibility & leveling (off by default; enabled in Strict preset)
+## ⚙️ Installation
 
-### User Interfaces
-
-- **Professional GUI**: User-friendly web interface with configurable validation settings and batch processing
-- **REST API**: FastAPI-based web service with configurable validation presets
-- **Annotated Results**: Visual feedback showing detected landmarks and validation issues
-- **Preset Configurations**: Strict, Basic, and Lenient validation modes
-
-## Usage
-
-### GUI Application
-
-Run the web-based application:
+A virtual environment is recommended.
 
 ```bash
-python main.py
-```
+# 1. Clone the repository
+git clone https://github.com/askiichan/IDPhotoReady.git
+cd IDPhotoReady
 
-The GUI provides:
-
-- **Image Upload**: Drag & drop or browse for image files
-- **Validation Configuration**: Choose from preset modes or customize individual validation categories:
-  - **Strict Mode**: All validation categories enabled (default)
-  - **Basic Mode**: Essential validations only (face sizing, eye validation)
-  - **Lenient Mode**: Core validations only (file handling, face detection) — background check off
-  - **Custom Mode**: Individual control over each validation category
-- **Real-time Results**: Instant validation feedback with detailed reasons
-- **Annotated Images**: Visual display with facial landmarks and validation overlays
-- **Batch Processing**: Process entire folders of images with progress tracking
-- **Processing Time**: Performance metrics for each validation
-
-**Supported formats**: JPG, PNG, BMP, TIFF
-
-After running the command, the application will start a local web server.
-Open your browser and navigate to the URL displayed in the terminal (typically http://localhost:7860) to access the interface.
-
-## Installation
-
-### Using Virtual Environment (Recommended)
-
-```bash
-# Clone or download the project
-cd id-photo-validator
-
-# Create virtual environment
+# 2. Create and activate a virtual environment
+# On Windows
 python -m venv venv
-
-# Activate virtual environment
 venv\Scripts\activate
 
-# Install dependencies
+# On macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
 ```
 
-### Dependencies
+The required AI models will be downloaded automatically on first run. For manual downloads, see [Troubleshooting](#🚑-troubleshooting).
 
-- Python 3.8 or higher
-- OpenCV with contrib modules
-- scikit-learn
-- Pillow (PIL)
-- Gradio (for GUI)
-- NumPy (dependency of OpenCV)
-- FastAPI and Uvicorn (for API)
-- Requests (for API client)
+## 🚀 Usage
 
-### REST API
+You can run this project as a self-contained web application or as a backend API.
 
-Start the API server:
+### 🖥️ Web GUI
+
+The easiest way to get started. Ideal for validating single photos or batches.
+
+1.  **Start the application:**
+    ```bash
+    python main.py
+    ```
+2.  **Open your browser** and navigate to the local URL shown in the terminal (usually `http://127.0.0.1:7860`).
+
+_The interface provides detailed failure reasons and an annotated image._
+
+### 🔌 REST API
+
+For programmatic access and integration with other services.
+
+1.  **Start the API server:**
+    ```bash
+    python start_api.py
+    ```
+2.  **Access the interactive documentation** in your browser at `http://localhost:8000/docs`. You can test all endpoints directly from this page.
+
+#### API Endpoints
+
+- `POST /validate`: Upload an image file for validation.
+- `POST /validate-base64`: Submit a base64-encoded image string.
+- `GET /health`: Check if the API is running.
+
+#### Example: cURL
 
 ```bash
-python start_api.py
+curl -X POST http://localhost:8000/validate \
+  -H "Accept: application/json" \
+  -F "file=@/path/to/photo.jpg;type=image/jpeg" \
+  -F "return_annotated=true" \
+  -F "validation_preset=custom" \
+  -F "face_sizing=true" \
+  -F "landmark_analysis=true" \
+  -F "eye_validation=true" \
+  -F "obstruction_detection=true" \
+  -F "mouth_validation=true" \
+  -F "quality_assessment=true" \
+  -F "background_validation=true" \
+  -F "shoulder_balance_validation=true"
 ```
 
-The API will be available at `http://localhost:8000` with interactive documentation at `http://localhost:8000/docs`.
+## ✔️ Validation Options
 
-#### Endpoints
+The system performs a series of checks. Most can be enabled or disabled.
 
-- `POST /validate` - Upload and validate an image file with configurable validation
-- `POST /validate-base64` - Validate a base64 encoded image with configurable validation
-- `GET /health` - Check API health status
+| Category                  | What it Checks                                               | Default     |
+| :------------------------ | :----------------------------------------------------------- | :---------- |
+| **Face Detection**        | Detects exactly one face with high confidence.               | Always On   |
+| **Face Sizing**           | Face occupies a reasonable portion (5-80%) of the image.     | On          |
+| **Landmark Analysis**     | All 68 facial landmarks are visible and properly positioned. | On          |
+| **Eye Validation**        | Both eyes are open using the Eye Aspect Ratio (EAR).         | On          |
+| **Obstruction Detection** | Face is not covered by hands, masks, or other objects.       | On          |
+| **Mouth Validation**      | Mouth is visible and not unnaturally obscured.               | On          |
+| **Image Quality**         | Image is not a cartoon or drawing (using color analysis).    | On          |
+| **Background**            | Background is uniform and neutral (e.g., white).             | On          |
+| **Shoulder Balance**      | Shoulders are visible, level, and framed correctly.          | Strict Only |
 
-#### Validation Configuration
+## 🔧 Configuration & Tuning
 
-The API supports three validation presets:
+You can fine-tune the validation logic by editing the constants in `id_validator/config.py`. This is for advanced users who need to adjust the validator's sensitivity.
 
-- **strict** (default): All validation categories enabled
-- **basic**: Essential validations (face sizing, eye validation)
-- **lenient**: Core validations only (face detection)
-- **custom**: Individual control via parameters
+**Background Validation Thresholds**
 
-#### Example Usage
+- `BG_MIN_MEAN_V`: Minimum brightness (0-255). Lower to allow darker backgrounds.
+- `BG_MAX_MEAN_S`: Maximum saturation (0-255). Raise to allow more colorful backgrounds.
+- `BG_SAMPLE_BORDER_PCT`: Size of the ring around the face used for sampling.
 
-```python
-import requests
+**Shoulder Balance Thresholds**
 
-# Strict validation (default)
-with open('photo.jpg', 'rb') as f:
-    response = requests.post(
-        'http://localhost:8000/validate',
-        files={'file': f},
-        data={
-            'return_annotated': True,
-            'validation_preset': 'strict'  # background_validation defaults to true in presets
-        }
-    )
+- `SHOULDER_VISIBILITY_THRESHOLD`: Minimum confidence score (0.0-1.0) for detecting shoulders.
+- `MAX_SHOULDER_TILT_DEG`: Maximum allowed angle for shoulder tilt.
+- `MIN_SHOULDER_WIDTH_TO_FACE_RATIO`: Minimum shoulder width relative to face width.
 
-# Custom validation configuration
-with open('photo.jpg', 'rb') as f:
-    response = requests.post(
-        'http://localhost:8000/validate',
-        files={'file': f},
-        data={
-            'validation_preset': 'custom',
-            'face_sizing': True,
-            'eye_validation': True,
-            'landmark_analysis': False,
-            'obstruction_detection': False,
-            'mouth_validation': False,
-            'quality_assessment': True,
-            'background_validation': True,  # toggle background check
-            'return_annotated': True
-        }
-    )
-    result = response.json()
-    print(f"Valid: {result['is_valid']}")
-```
-
-## Validation Criteria
-
-The system validates photos against configurable criteria organized into categories:
-
-### Core Requirements (Always Active)
-
-- **File Handling**: JPEG, PNG, or other common image formats
-- **Face Detection**: Must detect exactly one face with ≥85% confidence
-
-### Configurable Validation Categories
-
-#### Face Sizing
-
-- Face must occupy 5-80% of the total image area
-- Ensures proper framing for ID photo standards
-
-#### Landmark Analysis
-
-- All 68 facial landmarks must be detectable
-- Facial symmetry and landmark distribution checks
-- Nose bridge continuity validation
-- Landmark clustering analysis
-
-#### Eye Validation
-
-- Both eyes must be open (Eye Aspect Ratio ≥ 0.25)
-- Advanced EAR calculation for accurate closed eye detection
-
-#### Obstruction Detection
-
-- Face must not be covered by hands or objects
-- Skin color analysis (≥40% skin visible in face region)
-- HSV color space analysis for obstruction detection
-
-#### Mouth Validation
-
-- Mouth area must be clearly visible
-- Proper mouth positioning checks
-
-#### Background Validation
-
-- Background should be mostly white/neutral and reasonably uniform
-- Robust sampling: evaluates a ring-shaped region around the detected face (avoids clothing/edges)
-- HSV-based decision with configurable thresholds; visually annotates sampled region when `return_annotated=True`
-- Toggle via GUI checkbox or API param `background_validation` (default enabled; disabled in lenient preset)
-
-#### Quality Assessment
-
-#### Shoulder Balance Validation
-
-Uses MediaPipe Pose to locate left and right shoulder landmarks (indices 11 & 12). Pass/fail logic:
-
-- Both shoulders must have visibility ≥ `SHOULDER_VISIBILITY_THRESHOLD` (default 0.50)
-- Shoulders must be fully inside the frame
-- Shoulder y‑coordinates must lie below the lower portion of the detected face box (ensures upper torso is visible)
-- Shoulder width ≥ `MIN_SHOULDER_WIDTH_TO_FACE_RATIO * face_width` (default 0.80) to prevent overly tight crops
-- Absolute tilt angle ≤ `MAX_SHOULDER_TILT_DEG` (default 8°). Angle is normalized 0–90° after ordering shoulders left→right.
-
-Failure reasons added (examples):
-`Shoulders not level (tilt 12.3° > 8.0°).`, `Shoulder width too small relative to face`, `Both shoulders not confidently detected (low visibility).`
-
-Disabled by default in the GUI (checkbox "Shoulder Balance"). Enabled automatically in the Strict preset; off in Basic & Lenient.
-
-- Image must not be a cartoon or drawing
-- Color complexity analysis using KMeans clustering
-- Image quality and clarity validation
-
-## Project Structure
+## 📂 Project Structure
 
 ```
-protrait-validation-OpenCVYOLO/
-├── main.py                    # GUI application entry point
-├── api.py                     # FastAPI REST API application
-├── start_api.py              # API server startup script
-├── api_client_example.py     # API usage examples
-├── requirements.txt          # Python dependencies
-├── README.md                 # This documentation
-├── id_validator/             # Main validation package
-│   ├── __init__.py           # Package initialization
-│   ├── config.py             # Configuration constants
-│   ├── utils.py              # Utility functions
-│   ├── validator.py          # Core validation logic
-│   ├── validation_config.py  # Validation configuration classes
-│   ├── models.py             # Pydantic models for API
-│   ├── gui.py                # Legacy tkinter GUI application (deprecated)
-│   └── gradio_gui.py         # New Gradio GUI application
-├── models/                   # AI model files (auto-downloaded)
-│   ├── deploy.prototxt       # Face detection model architecture
-│   ├── lbfmodel.yaml         # Facial landmark detection model
-│   └── res10_300x300_ssd_iter_140000.caffemodel  # Face detection weights
-└── venv/                     # Virtual environment (if created)
+.
+├── main.py               # Gradio Web GUI entrypoint
+├── api.py                # FastAPI server entrypoint
+├── requirements.txt      # Dependencies
+├── id_validator/         # Core library
+│   ├── validator.py      # Validation pipeline
+│   ├── config.py         # Thresholds & constants
+│   ├── validation_config.py  # Preset option grouping
+│   ├── models.py         # Pydantic models
+│   └── gradio_gui.py     # GUI wiring
+├── models/               # Downloaded model weights
+└── test_imgs/            # Sample images
 ```
 
-## Technical Details
+## 🚑 Troubleshooting
 
-### Validation Architecture
+If the ML models do not download automatically, please check your internet connection. You can also download them manually from the links below and place them in the `models/` directory.
 
-- **Modular Design**: Configurable validation categories
-- **Preset Configurations**: Strict, Basic, and Lenient modes
-- **Custom Configuration**: Individual control over validation rules
+- [deploy.prototxt](https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt)
+- [res10_300x300_ssd_iter_140000.caffemodel](https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel)
+- [lbfmodel.yaml](https://github.com/spmallick/GSOC2017/raw/master/data/lbfmodel.yaml)
 
-### Models Used
+## 📄 License
 
-- **Face Detection**: OpenCV DNN with Caffe SSD MobileNet
-- **Landmark Detection**: LBF (Local Binary Features) 68-point model
-- **Eye Analysis**: Eye Aspect Ratio (EAR) calculation
-- **Quality Assessment**: KMeans clustering for cartoon detection
-- **Skin Detection**: HSV color space analysis
-- **Hand / Pose Detection**: MediaPipe Hands (obstruction) & MediaPipe Pose (shoulder balance)
+This project is licensed under the MIT License. See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
 
-### Configuration System
-
-- `ValidationConfig` class for flexible validation control
-- Preset configurations: `STRICT_CONFIG`, `BASIC_CONFIG`, `LENIENT_CONFIG`
-- Runtime configuration through GUI checkboxes or API parameters
-
-#### Background Validation thresholds
-
-The following constants in `id_validator/config.py` control background analysis:
-
-- `BG_SAMPLE_BORDER_PCT` — size of the ring sampled around the detected face (default: 0.08 ≈ 8% of min(image dimension)).
-- `BG_MIN_MEAN_V` — minimum acceptable brightness (V channel) for a white-ish background (default: 190).
-- `BG_MAX_MEAN_S` — maximum acceptable saturation (S channel) (default: 60).
-- `BG_MAX_V_STD` — target maximum brightness standard deviation for uniformity (used for diagnostics; background logic is now robust to small dark areas) (default: 60).
-
-Decision rule (implemented in `id_validator/validator.py`):
-
-- Pass if the ring's white-ish coverage is high (≥ 60%)
-  OR if overall V is high (≥ 190) and S is low (≤ 70).
-
-Tips for tuning:
-
-- If clean white backgrounds are failing: lower `BG_MIN_MEAN_V` (e.g., 185) or increase `BG_MAX_MEAN_S` (e.g., 70).
-- If colored backgrounds are slipping through: raise `BG_MIN_MEAN_V` or lower `BG_MAX_MEAN_S` back toward stricter values.
-- Increase `BG_SAMPLE_BORDER_PCT` slightly (e.g., 0.10) if the sampled ring is too close to hair/shoulders; decrease if images are tightly cropped.
-
-#### Shoulder Balance thresholds
-
-Constants in `id_validator/config.py`:
-
-- `SHOULDER_VISIBILITY_THRESHOLD` (default 0.50) – minimum MediaPipe visibility score for each shoulder landmark.
-- `MAX_SHOULDER_TILT_DEG` (default 8.0) – maximum allowed shoulder line tilt.
-- `MIN_SHOULDER_WIDTH_TO_FACE_RATIO` (default 0.80) – minimum shoulder span relative to face width.
-
-Tuning guidance:
-
-- Photos with slight natural posture variance failing: raise `MAX_SHOULDER_TILT_DEG` (e.g., 10–12).
-- Wide crops passing despite distant shoulders: raise `MIN_SHOULDER_WIDTH_TO_FACE_RATIO`.
-- Frequent missed shoulders in dim images: lower `SHOULDER_VISIBILITY_THRESHOLD` to 0.40 (may increase false positives).
-
-### Dependencies
-
-- OpenCV (cv2) with contrib modules
-- NumPy for numerical operations
-- scikit-learn for KMeans clustering
-- Tkinter for GUI (included with Python)
-- FastAPI and Uvicorn for REST API
-- Pillow for image handling
-- Requests for HTTP operations
-
-## Troubleshooting
-
-### Model Download Issues
-
-If models fail to download automatically:
-
-1. Check internet connection
-2. Manually download models to `models/` directory:
-   - [deploy.prototxt](https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt)
-   - [res10_300x300_ssd_iter_140000.caffemodel](https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel)
-   - [lbfmodel.yaml](https://github.com/spmallick/GSOC2017/raw/master/data/lbfmodel.yaml)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Note**: This application is designed for educational and development purposes. For production use in official ID systems, additional security and compliance measures may be required.
+**Disclaimer**: This tool is intended for educational and development purposes. For official use, ensure compliance with all local regulations.

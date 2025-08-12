@@ -347,8 +347,8 @@ class IDPhotoValidatorGradio:
             .option-row { align-items: center; }
             """
         ) as demo:
-            gr.Markdown("# ID Photo Validator")
-            gr.Markdown("Validate ID photos against institutional standards with configurable criteria.")
+            gr.Markdown("# IDPhotoReady")
+            gr.Markdown("A program that checks if a photo is suitable for use on an ID document.")
             
             with gr.Tabs():
                 # Single Image Validation Tab

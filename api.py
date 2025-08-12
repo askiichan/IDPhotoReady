@@ -97,7 +97,8 @@ async def validate_photo(
     obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
     mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
     quality_assessment: bool = Form(default=True, description="Enable quality assessment"),
-    background_validation: bool = Form(default=True, description="Enable background (white) validation")
+    background_validation: bool = Form(default=True, description="Enable background (white) validation"),
+    shoulder_balance_validation: bool = Form(default=False, description="Enable shoulder balance validation (pose)")
 ):
     """
     Validate an ID photo for compliance with standard requirements.
@@ -152,7 +153,8 @@ async def validate_photo(
                 obstruction_detection=obstruction_detection,
                 mouth_validation=mouth_validation,
                 quality_assessment=quality_assessment,
-                background_validation=background_validation
+                background_validation=background_validation,
+                shoulder_balance_validation=shoulder_balance_validation
             )
         
         # Perform validation
@@ -193,10 +195,12 @@ async def validate_photo(
         
         # If annotated image is requested and available
         if return_annotated and annotated_image is not None:
-            # Convert annotated image to base64
-            _, buffer = cv2.imencode('.jpg', annotated_image)
-            img_base64 = base64.b64encode(buffer).decode('utf-8')
-            response_data["annotated_image"] = f"data:image/jpeg;base64,{img_base64}"
+            try:
+                _, buffer = cv2.imencode('.jpg', annotated_image)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                response_data["annotated_image"] = f"data:image/jpeg;base64,{img_base64}"
+            except Exception:
+                pass
         
         return ValidationResponse(**response_data)
         
@@ -221,7 +225,8 @@ async def validate_photo_base64(
     obstruction_detection: bool = Form(default=True, description="Enable obstruction detection"),
     mouth_validation: bool = Form(default=True, description="Enable mouth validation"),
     quality_assessment: bool = Form(default=True, description="Enable quality assessment"),
-    background_validation: bool = Form(default=True, description="Enable background (white) validation")
+    background_validation: bool = Form(default=True, description="Enable background (white) validation"),
+    shoulder_balance_validation: bool = Form(default=False, description="Enable shoulder balance validation (pose)")
 ):
     """
     Validate an ID photo from base64 encoded image data.
@@ -274,7 +279,8 @@ async def validate_photo_base64(
                 obstruction_detection=obstruction_detection,
                 mouth_validation=mouth_validation,
                 quality_assessment=quality_assessment,
-                background_validation=background_validation
+                background_validation=background_validation,
+                shoulder_balance_validation=shoulder_balance_validation
             )
         
         # Perform validation
@@ -300,10 +306,12 @@ async def validate_photo_base64(
         
         # If annotated image is requested and available
         if return_annotated and annotated_image is not None:
-            # Convert annotated image to base64
-            _, buffer = cv2.imencode('.jpg', annotated_image)
-            img_base64 = base64.b64encode(buffer).decode('utf-8')
-            response_data["annotated_image"] = f"data:image/jpeg;base64,{img_base64}"
+            try:
+                _, buffer = cv2.imencode('.jpg', annotated_image)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                response_data["annotated_image"] = f"data:image/jpeg;base64,{img_base64}"
+            except Exception:
+                pass
         
         return ValidationResponse(**response_data)
         

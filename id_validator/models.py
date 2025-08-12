@@ -15,6 +15,7 @@ class ValidationResponse(BaseModel):
     confidence: Optional[float] = Field(None, description="Face detection confidence score")
     face_size_ratio: Optional[float] = Field(None, description="Face size as ratio of total image")
     landmarks_detected: Optional[int] = Field(None, description="Number of facial landmarks detected")
+    annotated_image: Optional[str] = Field(None, description="Base64 encoded annotated image (data URI)")
     timestamp: datetime = Field(default_factory=datetime.now, description="Validation timestamp")
     
     class Config:
