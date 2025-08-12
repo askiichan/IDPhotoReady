@@ -333,6 +333,9 @@ class IDPhotoValidatorGradio:
             @keyframes processGradient { 0%{background-position:0 0}100%{background-position:200% 0} }
             @keyframes processPulse { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)} 70%{box-shadow:0 0 0 14px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
             @keyframes processPulseHover { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)} 60%{box-shadow:0 0 0 18px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+            /* Inline option notes */
+            .option-note { font-size: .72rem; margin: 4px 0 0 4px; display:inline-block; }
+            .option-row { align-items: center; }
             """
         ) as demo:
             gr.Markdown("# ID Photo Validator")
@@ -349,13 +352,27 @@ class IDPhotoValidatorGradio:
                             # Validation Options (presets removed; direct selection)
                             gr.Markdown("### Validation Options")
                             with gr.Group() as custom_config:
-                                face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
-                                landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
-                                eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
-                                obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
-                                mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
-                                quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
-                                background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
+                                with gr.Row(elem_classes=["option-row"]):
+                                    face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
+                                    gr.Markdown("<span class='option-note'>(face % of image)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
+                                    gr.Markdown("<span class='option-note'>(68-point completeness / symmetry)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
+                                    gr.Markdown("<span class='option-note'>(eyes open & visible)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
+                                    gr.Markdown("<span class='option-note'>(hands/objects & uniform blocks)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
+                                    gr.Markdown("<span class='option-note'>(mouth region visible)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
+                                    gr.Markdown("<span class='option-note'>(cartoon/drawing check)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
+                                    gr.Markdown("<span class='option-note'>(white / uniform background)</span>")
                             
                         with gr.Column():
                             single_summary = gr.Textbox(label="Result Summary", lines=2, interactive=False)
@@ -427,13 +444,27 @@ class IDPhotoValidatorGradio:
                             # Validation Options for batch
                             gr.Markdown("### Validation Options")
                             with gr.Group() as batch_custom_config:
-                                batch_face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
-                                batch_landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
-                                batch_eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
-                                batch_obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
-                                batch_mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
-                                batch_quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
-                                batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_face_sizing_cb = gr.Checkbox(label="Face Sizing", value=True)
+                                    gr.Markdown("<span class='option-note'>(face % of image)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_landmark_analysis_cb = gr.Checkbox(label="Landmark Analysis", value=True)
+                                    gr.Markdown("<span class='option-note'>(68-point completeness / symmetry)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_eye_validation_cb = gr.Checkbox(label="Eye Validation", value=True)
+                                    gr.Markdown("<span class='option-note'>(eyes open & visible)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_obstruction_detection_cb = gr.Checkbox(label="Obstruction Detection", value=True)
+                                    gr.Markdown("<span class='option-note'>(hands/objects & uniform blocks)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_mouth_validation_cb = gr.Checkbox(label="Mouth Validation", value=True)
+                                    gr.Markdown("<span class='option-note'>(mouth region visible)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_quality_assessment_cb = gr.Checkbox(label="Quality Assessment", value=True)
+                                    gr.Markdown("<span class='option-note'>(cartoon/drawing check)</span>")
+                                with gr.Row(elem_classes=["option-row"]):
+                                    batch_background_validation_cb = gr.Checkbox(label="Background Validation", value=False)
+                                    gr.Markdown("<span class='option-note'>(white / uniform background)</span>")
                             
                             process_btn = gr.Button("Process Folder", variant="primary", elem_id="process-btn", interactive=False)
                             progress_output = gr.Textbox(label="Progress", interactive=False)
