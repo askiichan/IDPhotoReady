@@ -73,37 +73,3 @@ class ValidationConfig:
 
 # Default configuration
 DEFAULT_CONFIG = ValidationConfig()
-
-# Preset configurations
-STRICT_CONFIG = ValidationConfig(
-    face_sizing=True,
-    landmark_analysis=True,
-    eye_validation=True,
-    obstruction_detection=True,
-    mouth_validation=True,
-    quality_assessment=True,
-    background_validation=True
-    , shoulder_balance_validation=True
-)
-
-BASIC_CONFIG = ValidationConfig(
-    face_sizing=True,
-    landmark_analysis=False,
-    eye_validation=True,
-    obstruction_detection=False,
-    mouth_validation=False,
-    quality_assessment=False,
-    background_validation=True
-    , shoulder_balance_validation=False
-)
-
-LENIENT_CONFIG = ValidationConfig(
-    face_sizing=False,
-    landmark_analysis=False,
-    eye_validation=False,
-    obstruction_detection=False,
-    mouth_validation=False,
-    quality_assessment=False,
-    background_validation=False
-    , shoulder_balance_validation=False
-)

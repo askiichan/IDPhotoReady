@@ -100,33 +100,73 @@ curl -X POST http://localhost:8000/validate \
 
 The system performs a series of checks. Most can be enabled or disabled.
 
-| Category                  | What it Checks                                               | Default     |
-| :------------------------ | :----------------------------------------------------------- | :---------- |
-| **Face Detection**        | Detects exactly one face with high confidence.               | Always On   |
-| **Face Sizing**           | Face occupies a reasonable portion (5-80%) of the image.     | On          |
-| **Landmark Analysis**     | All 68 facial landmarks are visible and properly positioned. | On          |
-| **Eye Validation**        | Both eyes are open using the Eye Aspect Ratio (EAR).         | On          |
-| **Obstruction Detection** | Face is not covered by hands, masks, or other objects.       | On          |
-| **Mouth Validation**      | Mouth is visible and not unnaturally obscured.               | On          |
-| **Image Quality**         | Image is not a cartoon or drawing (using color analysis).    | On          |
-| **Background**            | Background is uniform and neutral (e.g., white).             | On          |
-| **Shoulder Balance**      | Shoulders are visible, level, and framed correctly.          | Strict Only |
+| Category                  | What it Checks                                               | Default   |
+| :------------------------ | :----------------------------------------------------------- | :-------- |
+| **Face Detection**        | Detects exactly one face with high confidence.               | Always On |
+| **Face Sizing**           | Face occupies a reasonable portion (5-80%) of the image.     | On        |
+| **Landmark Analysis**     | All 68 facial landmarks are visible and properly positioned. | On        |
+| **Eye Validation**        | Both eyes are open using the Eye Aspect Ratio (EAR).         | On        |
+| **Obstruction Detection** | Face is not covered by hands, masks, or other objects.       | On        |
+| **Mouth Validation**      | Mouth is visible and not unnaturally obscured.               | On        |
+| **Image Quality**         | Image is not a cartoon or drawing (using color analysis).    | On        |
+| **Background**            | Background is uniform and neutral (e.g., white).             | Off       |
+| **Shoulder Balance**      | Shoulders are visible, level, and framed correctly.          | Off       |
 
 ## 🔧 Configuration & Tuning
 
-You can fine-tune the validation logic by editing the constants in `id_validator/config.py`. This is for advanced users who need to adjust the validator's sensitivity.
+Most behavior is controlled by constants in `id_validator/config.py` and feature toggles/presets in `id_validator/validation_config.py`.
 
-**Background Validation Thresholds**
+### 1. Feature Toggles / Presets
 
-- `BG_MIN_MEAN_V`: Minimum brightness (0-255). Lower to allow darker backgrounds.
-- `BG_MAX_MEAN_S`: Maximum saturation (0-255). Raise to allow more colorful backgrounds.
-- `BG_SAMPLE_BORDER_PCT`: Size of the ring around the face used for sampling.
+Runtime categories you can enable/disable (API form fields / GUI checkboxes):
+`face_sizing`, `landmark_analysis`, `eye_validation`, `obstruction_detection`, `mouth_validation`, `quality_assessment`, `background_validation`, `shoulder_balance_validation`.
 
-**Shoulder Balance Thresholds**
+### 2. Core Thresholds (`config.py`)
 
-- `SHOULDER_VISIBILITY_THRESHOLD`: Minimum confidence score (0.0-1.0) for detecting shoulders.
-- `MAX_SHOULDER_TILT_DEG`: Maximum allowed angle for shoulder tilt.
-- `MIN_SHOULDER_WIDTH_TO_FACE_RATIO`: Minimum shoulder width relative to face width.
+Face / Detection:
+
+- `MIN_FACE_SIZE_RATIO` / `MAX_FACE_SIZE_RATIO`: Acceptable face area (fraction of image). Widen if rejecting valid crops.
+- `MIN_FACE_CONFIDENCE`: Min detector confidence (raise for fewer false positives; lower for tough images).
+
+Eyes / Landmarks:
+
+- `EAR_THRESHOLD`: Below this Eye Aspect Ratio counts as closed.
+
+Obstruction & Authenticity (natural vs cartoon / occlusion heuristics):
+
+- `MIN_SKIN_PERCENTAGE`: Minimum skin pixel ratio inside face ROI.
+- `MAX_UNIFORM_BLOCK_RATIO`: Max proportion of face that can be nearly flat color.
+- `UNIFORM_COLOR_STD_THRESHOLD`: Variance cutoff for detecting flat regions.
+- `MIN_EDGE_DENSITY`: Low edges -> possible obstruction or synthetic/cartoon.
+- `MIN_COLOR_VARIANCE`: Minimum overall color variability.
+- `MAX_DARK_PIXEL_RATIO` / `MAX_BRIGHT_PIXEL_RATIO`: Extremes indicating poor exposure or masking.
+- `DARK_PIXEL_THRESHOLD` / `BRIGHT_PIXEL_THRESHOLD`: Value cutoffs for the above ratios.
+- `CARTOON_THRESHOLD`: K‑means color cluster count (lower = simpler palette = suspect).
+
+Background (uniform neutral backdrop):
+
+- `BG_SAMPLE_BORDER_PCT`: Border thickness sampled for background stats.
+- `BG_MIN_MEAN_V`: Minimum brightness (HSV V 0–255) to treat as sufficiently light.
+- `BG_MAX_MEAN_S`: Max saturation (HSV S) to still count as neutral.
+- `BG_MAX_V_STD`: Max brightness variation to consider background uniform.
+
+Shoulder / Upper body alignment:
+
+- `SHOULDER_VISIBILITY_THRESHOLD`: Min MediaPipe visibility for each shoulder.
+- `MAX_SHOULDER_TILT_DEG`: Max allowed tilt (increase to be less strict).
+- `MIN_SHOULDER_WIDTH_TO_FACE_RATIO`: Ensures framing includes shoulders.
+
+### 3. When to Adjust
+
+- Frequent rejections for "face too small/large": relax `MIN_FACE_SIZE_RATIO` / tighten `MAX_FACE_SIZE_RATIO`.
+- Valid open eyes flagged: lower `EAR_THRESHOLD` slightly (e.g. 0.23).
+- Too many cartoons slipping through: lower `CARTOON_THRESHOLD` or raise `MIN_EDGE_DENSITY`.
+- Legit photos with colored (but acceptable) backgrounds rejected: raise `BG_MAX_MEAN_S` or lower `BG_MIN_MEAN_V`.
+- Shoulder tilt false positives: raise `MAX_SHOULDER_TILT_DEG` by 1–2 degrees.
+
+### 4. Safe Editing Tips
+
+Change one variable at a time; keep a short log of adjustments. If outcomes worsen, revert quickly. Consider committing a `config.local.py` and importing overrides (future enhancement).
 
 ## 📂 Project Structure
 
