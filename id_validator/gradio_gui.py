@@ -334,7 +334,7 @@ class IDPhotoValidatorGradio:
                 with gr.TabItem("Single Image Validation"):
                     with gr.Row():
                         with gr.Column():
-                            image_input = gr.Image(type="filepath", label="Upload Image")
+                            image_input = gr.Image(type="filepath", label="Upload Image", height=400)
                             validate_btn = gr.Button("Validate Image", variant="primary", elem_id="validate-btn", interactive=False)
                             
                             # Validation Options (presets removed; direct selection)
@@ -367,7 +367,7 @@ class IDPhotoValidatorGradio:
                             
                         with gr.Column():
                             single_summary = gr.Textbox(label="Result Summary", lines=2, interactive=False)
-                            annotated_output = gr.Image(label="Annotated Image")
+                            annotated_output = gr.Image(label="Annotated Image", height=400)
                             single_table = gr.Dataframe(
                                 headers=["File", "Status", "Reasons", "Time (s)"],
                                 datatype=["str", "str", "str", "number"],

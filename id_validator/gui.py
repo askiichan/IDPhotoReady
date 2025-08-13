@@ -411,7 +411,7 @@ class IDPhotoValidatorGUI:
             orig_width, orig_height = img.size
             
             # Set a reasonable max size while maintaining aspect ratio
-            max_width, max_height = 400, 300
+            max_width, max_height = 400, 200
             
             # Calculate the scaling factor to fit within the max dimensions
             width_ratio = max_width / orig_width if orig_width > max_width else 1
