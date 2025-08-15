@@ -31,7 +31,7 @@ MIN_FACE_SIZE_RATIO = 0.05  # 5% of the image area
 MAX_FACE_SIZE_RATIO = 0.80  # 80% of the image area
 
 # Eye Aspect Ratio threshold for closed eye detection
-EAR_THRESHOLD = 0.25
+EAR_THRESHOLD = 0.2
 
 # Enhanced Obstruction Detection Parameters
 MIN_SKIN_PERCENTAGE = 0.4  # Minimum skin percentage required

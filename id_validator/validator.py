@@ -368,7 +368,7 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
                 right_side_points = landmark_points[landmark_points[:, 0] >= face_center_x]
                 
                 if len(left_side_points) < 20 or len(right_side_points) < 20:
-                    reasons.append("Facial landmarks are unevenly distributed. Face may be partially covered.")
+                    reasons.append("Facial landmarks are unevenly distributed. Face may be partially covered or not facing forward.")
             
             # Eye Validation (configurable)
             if config.eye_validation:
@@ -388,13 +388,13 @@ def validate_id_photo(image_path: str, return_annotated: bool = False, config: V
                 right_ear = calculate_eye_aspect_ratio(right_eye_landmarks)
                 
                 # EAR threshold for open eyes (typically > 0.2 for open eyes)
-                EAR_THRESHOLD = 0.25
                 
+
                 if left_ear < EAR_THRESHOLD:
-                    reasons.append(f"Left eye appears to be closed or nearly closed (EAR: {left_ear:.3f}).")
-                
+                    reasons.append(f"Left eye appears to be closed or nearly closed (EAR: {left_ear:.3f}, EAR_THRESHOLD: {EAR_THRESHOLD}).")
+
                 if right_ear < EAR_THRESHOLD:
-                    reasons.append(f"Right eye appears to be closed or nearly closed (EAR: {right_ear:.3f}).")
+                    reasons.append(f"Right eye appears to be closed or nearly closed (EAR: {right_ear:.3f}, EAR_THRESHOLD: {EAR_THRESHOLD}).")
                 
                 # Additional eye dimension checks
                 left_eye_width = np.max(left_eye_landmarks[:, 0]) - np.min(left_eye_landmarks[:, 0])
